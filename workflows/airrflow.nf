@@ -206,96 +206,100 @@ workflow AIRRFLOW {
             error "Mode parameter value not valid."
         }
 
-        // Perform V(D)J annotation and filtering
-        VDJ_ANNOTATION(
-            ch_fasta,
-            ch_tsv_files,
-            ch_validated_samplesheet.collect(),
-            DATABASES.out.igblast.collect(),
-            DATABASES.out.reference_fasta.collect()
-        )
-        ch_versions = ch_versions.mix( VDJ_ANNOTATION.out.versions )
+        if (!params.skip_vdj_annotation) {
+            // Perform V(D)J annotation and filtering
+            VDJ_ANNOTATION(
+                ch_fasta,
+                ch_tsv_files,
+                ch_validated_samplesheet.collect(),
+                DATABASES.out.igblast.collect(),
+                DATABASES.out.reference_fasta.collect()
+            )
+            ch_versions = ch_versions.mix( VDJ_ANNOTATION.out.versions )
 
-        // Split bulk and single cell repertoires
-        ch_repertoire_by_processing = VDJ_ANNOTATION.out.repertoire
-            .branch { it ->
-                single: it[0].single_cell == 'true'
-                bulk:   it[0].single_cell == 'false'
+            // Split bulk and single cell repertoires
+            ch_repertoire_by_processing = VDJ_ANNOTATION.out.repertoire
+                .branch { it ->
+                    single: it[0].single_cell == 'true'
+                    bulk:   it[0].single_cell == 'false'
+                }
+
+            // Bulk: Assign germlines and filtering
+            ch_repertoire_by_processing.bulk
+
+            BULK_QC_AND_FILTER(
+                ch_repertoire_by_processing.bulk,
+                VDJ_ANNOTATION.out.reference_fasta.collect()
+            )
+            ch_versions = ch_versions.mix( BULK_QC_AND_FILTER.out.versions )
+
+            ch_bulk_filtered = BULK_QC_AND_FILTER.out.repertoires
+
+            // Single cell: QC and filtering
+            ch_repertoire_by_processing.single
+
+            SINGLE_CELL_QC_AND_FILTERING(
+                ch_repertoire_by_processing.single
+            )
+            ch_versions = ch_versions.mix( SINGLE_CELL_QC_AND_FILTERING.out.versions )
+
+            // Mixing bulk and single cell channels after filtering
+            ch_repertoires_after_qc = ch_bulk_filtered
+                                            .mix(SINGLE_CELL_QC_AND_FILTERING.out.repertoires)
+
+            // Clonal analysis
+            if (!params.skip_clonal_analysis) {
+                CLONAL_ANALYSIS(
+                    ch_repertoires_after_qc,
+                    VDJ_ANNOTATION.out.reference_fasta.collect(),
+                    ch_report_logo_img.collect().ifEmpty([])
+                )
+                ch_versions = ch_versions.mix( CLONAL_ANALYSIS.out.versions)
             }
 
-        // Bulk: Assign germlines and filtering
-        ch_repertoire_by_processing.bulk
+            // Translation and embedding
+            if (params.translate || params.embeddings) {
+                TRANSLATE_EMBED(
+                    ch_repertoires_after_qc,
+                    DATABASES.out.igblast.collect()
+                )
+                ch_versions = ch_versions.mix( TRANSLATE_EMBED.out.versions )
+            }
 
-        BULK_QC_AND_FILTER(
-            ch_repertoire_by_processing.bulk,
-            VDJ_ANNOTATION.out.reference_fasta.collect()
-        )
-        ch_versions = ch_versions.mix( BULK_QC_AND_FILTER.out.versions )
+            if (!params.skip_report){
+                ch_all_repertoires_after_qc = ch_repertoires_after_qc
+                    .map { it -> it[1] }
+                    .collect()
+                    .map { it -> [ [id:'all_reps'], it ] }
 
-        ch_bulk_filtered = BULK_QC_AND_FILTER.out.repertoires
-
-        // Single cell: QC and filtering
-        ch_repertoire_by_processing.single
-
-        SINGLE_CELL_QC_AND_FILTERING(
-            ch_repertoire_by_processing.single
-        )
-        ch_versions = ch_versions.mix( SINGLE_CELL_QC_AND_FILTERING.out.versions )
-
-        // Mixing bulk and single cell channels after filtering
-        ch_repertoires_after_qc = ch_bulk_filtered
-                                        .mix(SINGLE_CELL_QC_AND_FILTERING.out.repertoires)
-
-        // Clonal analysis
-        if (!params.skip_clonal_analysis) {
-            CLONAL_ANALYSIS(
-                ch_repertoires_after_qc,
-                VDJ_ANNOTATION.out.reference_fasta.collect(),
-                ch_report_logo_img.collect().ifEmpty([])
-            )
-            ch_versions = ch_versions.mix( CLONAL_ANALYSIS.out.versions)
+                REPERTOIRE_ANALYSIS_REPORTING(
+                    ch_presto_filterseq_logs.collect().ifEmpty([]),
+                    ch_presto_maskprimers_logs.collect().ifEmpty([]),
+                    ch_presto_pairseq_logs.collect().ifEmpty([]),
+                    ch_presto_clustersets_logs.collect().ifEmpty([]),
+                    ch_presto_buildconsensus_logs.collect().ifEmpty([]),
+                    ch_presto_postconsensus_pairseq_logs.collect().ifEmpty([]),
+                    ch_presto_assemblepairs_logs.collect().ifEmpty([]),
+                    ch_presto_collapseseq_logs.collect().ifEmpty([]),
+                    ch_presto_splitseq_logs.collect().ifEmpty([]),
+                    ch_input_check_logs.collect().ifEmpty([]),
+                    ch_reassign_logs.collect().ifEmpty([]),
+                    VDJ_ANNOTATION.out.changeo_makedb_logs.collect().ifEmpty([]),
+                    VDJ_ANNOTATION.out.logs.collect().ifEmpty([]),
+                    BULK_QC_AND_FILTER.out.logs.collect().ifEmpty([]),
+                    SINGLE_CELL_QC_AND_FILTERING.out.logs.collect().ifEmpty([]),
+                    ch_all_repertoires_after_qc,
+                    ch_input.collect(),
+                    ch_report_rmd.collect(),
+                    ch_report_css.collect(),
+                    ch_report_logo.collect(),
+                    ch_validated_samplesheet.collect()
+                )
+                ch_versions = ch_versions.mix( REPERTOIRE_ANALYSIS_REPORTING.out.versions )
+            }
+        } else {
+            log.info "Skipping V(D)J annotation and downstream steps because --skip_vdj_annotation was set."
         }
-
-        // Translation and embedding
-        if (params.translate || params.embeddings) {
-            TRANSLATE_EMBED(
-                ch_repertoires_after_qc,
-                DATABASES.out.igblast.collect()
-            )
-            ch_versions = ch_versions.mix( TRANSLATE_EMBED.out.versions )
-        }
-
-        if (!params.skip_report){
-            ch_all_repertoires_after_qc = ch_repertoires_after_qc
-                .map { it -> it[1] }
-                .collect()
-                .map { it -> [ [id:'all_reps'], it ] }
-
-            REPERTOIRE_ANALYSIS_REPORTING(
-                ch_presto_filterseq_logs.collect().ifEmpty([]),
-                ch_presto_maskprimers_logs.collect().ifEmpty([]),
-                ch_presto_pairseq_logs.collect().ifEmpty([]),
-                ch_presto_clustersets_logs.collect().ifEmpty([]),
-                ch_presto_buildconsensus_logs.collect().ifEmpty([]),
-                ch_presto_postconsensus_pairseq_logs.collect().ifEmpty([]),
-                ch_presto_assemblepairs_logs.collect().ifEmpty([]),
-                ch_presto_collapseseq_logs.collect().ifEmpty([]),
-                ch_presto_splitseq_logs.collect().ifEmpty([]),
-                ch_input_check_logs.collect().ifEmpty([]),
-                ch_reassign_logs.collect().ifEmpty([]),
-                VDJ_ANNOTATION.out.changeo_makedb_logs.collect().ifEmpty([]),
-                VDJ_ANNOTATION.out.logs.collect().ifEmpty([]),
-                BULK_QC_AND_FILTER.out.logs.collect().ifEmpty([]),
-                SINGLE_CELL_QC_AND_FILTERING.out.logs.collect().ifEmpty([]),
-                ch_all_repertoires_after_qc,
-                ch_input.collect(),
-                ch_report_rmd.collect(),
-                ch_report_css.collect(),
-                ch_report_logo.collect(),
-                ch_validated_samplesheet.collect()
-            )
-        }
-        ch_versions = ch_versions.mix( REPERTOIRE_ANALYSIS_REPORTING.out.versions )
 
     //
     // Collate and save software versions

@@ -447,6 +447,12 @@
                     "type": "boolean",
                     "description": "Set this flag to fetch the IMGT reference data at runtime.",
                     "fa_icon": "fas fa-cloud-download-alt"
+                },
+                "skip_vdj_annotation": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip V(D)J annotation and all downstream analysis steps, running sequence assembly only.",
+                    "fa_icon": "fas fa-forward"
                 }
             },
             "fa_icon": "fas fa-edit"
