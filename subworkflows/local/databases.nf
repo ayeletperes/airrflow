@@ -9,6 +9,7 @@ workflow DATABASES {
 
     main:
     ch_versions = Channel.empty()
+    ch_airrdb_source = Channel.value(params.airrdb_source)
 
     if( !params.fetch_database ){
         if (params.reference_igblast.endsWith(".zip")) {
@@ -39,13 +40,13 @@ workflow DATABASES {
                 .set { ch_reference_fasta }
         }
 
-        VALIDATE_IGBLAST_DB(ch_igblast, ch_reference_fasta)
+        VALIDATE_IGBLAST_DB(ch_igblast, ch_reference_fasta, ch_airrdb_source)
         ch_igblast = VALIDATE_IGBLAST_DB.out.igblast
         ch_versions = ch_versions.mix(VALIDATE_IGBLAST_DB.out.versions)
     }
 
     if (params.fetch_database == "imgt" || params.fetch_database == "airrc-imgt") {
-        FETCH_DATABASES(Channel.value(params.fetch_database))
+        FETCH_DATABASES(Channel.value(params.fetch_database), ch_airrdb_source)
         ch_igblast = FETCH_DATABASES.out.igblast
         ch_reference_fasta = FETCH_DATABASES.out.reference_fasta
         ch_versions = ch_versions.mix(FETCH_DATABASES.out.versions)

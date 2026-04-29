@@ -18,13 +18,16 @@ nextflow_pipeline {
             def stable_name = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}'])
             // stable_path: All files in ${params.outdir}/ with stable content
             def stable_path = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
+            def versionsFile = "$outputDir/pipeline_info/nf_core_airrflow_software_mqc_versions.yml"
             assertAll(
                 { assert workflow.success},
+                { assert path(versionsFile).text.contains("VALIDATE_IGBLAST_DB") },
+                { assert path(versionsFile).text.contains("airrdb:") },
                 { assert snapshot(
                     // Number of successful tasks
                     workflow.trace.succeeded().size(),
                     // pipeline versions.yml file for multiqc from which Nextflow version is removed because we test pipelines on multiple Nextflow versions
-                    removeNextflowVersion("$outputDir/pipeline_info/nf_core_airrflow_software_mqc_versions.yml"),
+                    removeNextflowVersion(versionsFile),
                     // All stable path name, with a relative path
                     stable_name,
                     // All files with stable contents

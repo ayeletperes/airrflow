@@ -10,6 +10,7 @@ process FETCH_DATABASES {
 
     input:
     val(database_type)
+    val(airrdb_src)
 
     output:
     path("igblast_base"), emit: igblast
@@ -24,13 +25,16 @@ process FETCH_DATABASES {
 
     script:
     """
-    fetch_databases.sh -d ${database_type}
+    python -m pip install --no-deps --target airrdb_site "${airrdb_src}"
+    export PYTHONPATH="\$PWD/airrdb_site\${PYTHONPATH:+:\$PYTHONPATH}"
+    python -m airrdb.cli fetch --source ${database_type} --out reference_base --build --igblast-out igblast_base
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         Reference download date: \$( echo \$(date "+%F") )
         igblastn: \$( igblastn -version | grep -o "igblast[0-9\\. ]\\+" | grep -o "[0-9\\. ]\\+" )
         changeo: \$( AssignGenes.py --version | awk -F' '  '{print \$2}' )
+        airrdb: \$( PYTHONPATH="\$PWD/airrdb_site\${PYTHONPATH:+:\$PYTHONPATH}" python -c "import importlib.metadata; print(importlib.metadata.version('airrdb'))" )
     END_VERSIONS
     """
 }

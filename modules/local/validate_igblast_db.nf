@@ -11,6 +11,7 @@ process VALIDATE_IGBLAST_DB {
     input:
     path(igblast_dir)
     path(reference_fasta_dir)
+    val(airrdb_src)
 
     output:
     path("igblast_base"), emit: igblast
@@ -19,11 +20,14 @@ process VALIDATE_IGBLAST_DB {
     script:
     """
     mv "${igblast_dir}" input_igblast_base
-    validate_igblast_db.sh -i input_igblast_base -r "${reference_fasta_dir}" -o igblast_base
+    python -m pip install --no-deps --target airrdb_site "${airrdb_src}"
+    export PYTHONPATH="\$PWD/airrdb_site\${PYTHONPATH:+:\$PYTHONPATH}"
+    python -m airrdb.cli validate --igblast input_igblast_base --reference "${reference_fasta_dir}" --rebuild --out igblast_base
 
     cat <<-END_VERSIONS > versions.yml
     "${task.process}":
         bash: \$(echo \$(bash --version | head -n 1) | sed 's/^GNU bash, version //; s/(.*\$//')
+        airrdb: \$( PYTHONPATH="\$PWD/airrdb_site\${PYTHONPATH:+:\$PYTHONPATH}" python -c "import importlib.metadata; print(importlib.metadata.version('airrdb'))" )
     END_VERSIONS
     """
 }
