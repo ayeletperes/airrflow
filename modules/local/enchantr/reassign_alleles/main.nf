@@ -12,6 +12,7 @@ process REASSIGN_ALLELES {
 
     label 'process_long_parallelized'
     label 'immcantation'
+    label 'immcantation_container'
 
     container "docker.io/immcantation/airrflow:5.1.0"
 
@@ -21,7 +22,9 @@ process REASSIGN_ALLELES {
     val outputby // which field to use for output
 
     output:
-    tuple val(meta), path("*/*/*reassign-pass.tsv"), emit: tab // reassigned repertoire
+    // enchantr writes this gzipped (_reassign-pass.tsv.gz); the trailing * accepts
+    // both so the module works against either enchantr build.
+    tuple val(meta), path("*/*/*reassign-pass.tsv*"), emit: tab // reassigned repertoire
     path("*/*_command_log.txt"), emit: logs //process logs
     path "*_report"
     tuple val("${task.process}"), val('enchantr'), eval('Rscript -e "library(enchantr); cat(as.character(packageVersion(\'enchantr\')))"'), emit: versions_enchantr, topic: versions

@@ -12,6 +12,7 @@ process BAYESIAN_GENOTYPE_INFERENCE {
 
     label 'process_long_parallelized'
     label 'immcantation'
+    label 'immcantation_container'
 
     container "docker.io/immcantation/airrflow:5.1.0"
 
