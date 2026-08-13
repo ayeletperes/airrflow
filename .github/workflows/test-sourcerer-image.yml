@@ -1,0 +1,97 @@
+name: Test sourcerer fetch (custom image)
+
+# Builds a custom image (an Immcantation base with the sourcerer package installed
+# on top) and exercises the germline paths that use it:
+#   1. the FETCH_DATABASES module, via the test_fetchimgt / test_fetch_airrc_imgt
+#      profiles, with the process container overridden to the built image;
+#   2. the "bring your own reference" path -- a sourcerer-built reference_base /
+#      igblast_base passed to --reference_fasta / --reference_igblast with
+#      --fetch_germlines none.
+#
+# It is heavy (two germline fetches + two pipeline runs), so it is manual by
+# default. Point `runs-on` at a self-hosted runner for routine use.
+on:
+  workflow_dispatch:
+    inputs:
+      base_image:
+        description: "Base image sourcerer is installed on top of"
+        default: "docker.io/immcantation/airrflow:5.1.0"
+      sourcerer_ref:
+        description: "sourcerer branch/tag to install"
+        default: "main"
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  sourcerer-image:
+    runs-on: ubuntu-latest
+    env:
+      IMAGE: local.registry/airrflow-sourcerer:test
+      NXF_VER: "24.10.4"
+    steps:
+      - name: Check out airrflow
+        uses: actions/checkout@v4
+
+      - name: Check out sourcerer into the build context
+        uses: actions/checkout@v4
+        with:
+          repository: immcantation/sourcerer
+          ref: ${{ github.event.inputs.sourcerer_ref }}
+          # A PAT with read access is needed while sourcerer is private; the
+          # default GITHUB_TOKEN cannot read another repo. Once sourcerer is
+          # public this can be dropped.
+          token: ${{ secrets.SOURCERER_TOKEN || github.token }}
+          path: sourcerer_src
+
+      - name: Build the sourcerer image
+        run: |
+          docker build -t "$IMAGE" \
+            -f docker/sourcerer/Dockerfile \
+            --build-arg BASE="${{ github.event.inputs.base_image }}" \
+            .
+          echo "== smoke test =="
+          docker run --rm "$IMAGE" bash -lc "sourcerer sources list && makeblastdb -version | head -1"
+
+      - name: Install Nextflow
+        uses: nf-core/setup-nextflow@v2
+        with:
+          version: ${{ env.NXF_VER }}
+
+      # --- 1. the FETCH_DATABASES module, fetching with sourcerer ---
+      - name: Module fetch (imgt) via sourcerer
+        run: |
+          nextflow run main.nf \
+            -profile test_fetchimgt,docker \
+            -c tests/config/sourcerer_image.config \
+            --outdir results_fetchimgt
+      - name: Module fetch (airrc-imgt) via sourcerer
+        run: |
+          nextflow run main.nf \
+            -profile test_fetch_airrc_imgt,docker \
+            -c tests/config/sourcerer_image.config \
+            --outdir results_airrc
+
+      # --- 2. custom reference directory via --reference_fasta/--reference_igblast ---
+      - name: Build a reference with sourcerer, then feed it back as a custom reference
+        run: |
+          mkdir -p custom_ref && cd custom_ref
+          docker run --rm -u "$(id -u):$(id -g)" -v "$PWD":/work -w /work "$IMAGE" bash -lc '
+            sourcerer imgt download human --outdir out
+            mv out/reference_base reference_base
+            sourcerer reference build reference_base --out igblast_base'
+          cd ..
+          nextflow run main.nf \
+            -profile test_assembled_hs,docker \
+            --fetch_germlines none \
+            --reference_fasta "$PWD/custom_ref/reference_base" \
+            --reference_igblast "$PWD/custom_ref/igblast_base" \
+            --outdir results_custom_ref
+
+      - name: Summarise
+        if: always()
+        run: |
+          echo "igblast databases built by the module fetch:"
+          ls results_fetchimgt* 2>/dev/null || true
+          find . -name 'human_ig_v.ndb' 2>/dev/null | head
