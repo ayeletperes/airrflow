@@ -10,7 +10,6 @@ process REMOVE_CHIMERIC {
 
     input:
     tuple val(meta), path(tab) // sequence tsv in AIRR format
-    path(reference_fasta)
 
     output:
     tuple val(meta), path("*chimera-pass.tsv"), emit: tab // sequence tsv in AIRR format

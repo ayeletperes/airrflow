@@ -23,7 +23,7 @@ process PRESTO_ASSEMBLEPAIRS_SEQUENTIAL {
     def args2 = task.ext.args2 ?: ''
     """
     AssemblePairs.py sequential -1 $R2 -2 $R1 --nproc ${task.cpus} \\
-        -r "${igblast}/fasta/${meta.species}_${meta.locus.toLowerCase()}_v.fasta" \\
+        -r "${igblast}/fasta/${meta.species.toLowerCase()}_${meta.locus.toLowerCase()}_v.fasta" \\
         $args \\
         --outname ${meta.id} --log ${meta.id}.log > ${meta.id}_command_log.txt
     ParseLog.py -l ${meta.id}.log $args2

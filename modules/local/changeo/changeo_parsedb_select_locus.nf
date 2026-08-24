@@ -28,5 +28,7 @@ process CHANGEO_PARSEDB_SELECT_LOCUS {
         ParseDb.py select -d $tab -f locus -u "TR[ABDG]" --regex --outname ${meta.id} > "${meta.id}_command_log.txt"
 
         """
+    } else {
+        error "Unsupported locus '${meta.locus}' for sample '${meta.id}'. CHANGEO_PARSEDB_SELECT_LOCUS supports IG and TR."
     }
 }

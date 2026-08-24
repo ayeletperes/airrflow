@@ -23,7 +23,7 @@ process CHANGEO_CREATEGERMLINES {
     def args = task.ext.args ?: ''
     """
     CreateGermlines.py -d ${tab} \\
-    -r ${reference_fasta}/${meta.species}/vdj/ \\
+    -r ${reference_fasta}/${meta.species.toLowerCase()}/vdj/ \\
     -g dmask --format airr \\
     --log ${meta.id}.log --outname ${meta.id} $args > ${meta.id}_create-germlines_command_log.txt
     ParseLog.py -l ${meta.id}.log -f ID V_CALL D_CALL J_CALL

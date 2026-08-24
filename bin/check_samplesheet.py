@@ -113,8 +113,8 @@ def check_samplesheet(file_in, assembled):
                 if col not in header:
                     print("ERROR: Please check samplesheet header: {} ".format(",".join(header)))
                     print("Header is missing column {}".format(col))
-                    print("Header must contain columns {}".format("\t".join(required_columns)))
-                    raise IndexError("Header must contain columns {}".format("\t".join(required_columns)))
+                    print("Header must contain columns {}".format("\t".join(required_columns_assembled)))
+                    raise IndexError("Header must contain columns {}".format("\t".join(required_columns_assembled)))
             for col in no_whitespaces_assembled:
                 values = tab[col].tolist()
                 if any([re.search(r"\s+", s) for s in values]):
@@ -128,8 +128,8 @@ def check_samplesheet(file_in, assembled):
                 if col not in header:
                     print("ERROR: Please check samplesheet header: {} ".format(",".join(header)))
                     print("Header is missing column {}".format(col))
-                    print("Header must contain columns {}".format("\t".join(required_columns)))
-                    raise IndexError("Header must contain columns {}".format("\t".join(required_columns)))
+                    print("Header must contain columns {}".format("\t".join(required_columns_raw)))
+                    raise IndexError("Header must contain columns {}".format("\t".join(required_columns_raw)))
             for col in no_whitespaces_raw:
                 values = tab[col].tolist()
                 if any([re.search(r"\s+", s) for s in values]):

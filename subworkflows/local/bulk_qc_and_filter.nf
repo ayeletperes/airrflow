@@ -28,8 +28,7 @@ workflow BULK_QC_AND_FILTER {
 
         // Remove chimera
         REMOVE_CHIMERIC(
-            CHANGEO_CREATEGERMLINES.out.tab,
-            ch_reference_fasta.collect()
+            CHANGEO_CREATEGERMLINES.out.tab
         )
         ch_logs = ch_logs.mix(REMOVE_CHIMERIC.out.logs)
         ch_bulk_chimeric_pass = REMOVE_CHIMERIC.out.tab
