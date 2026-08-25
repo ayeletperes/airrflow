@@ -7,6 +7,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 ### `Added`
 
+- Added the `--generate_igblast_aux` parameter (default `false`), which regenerates the IgBLAST `.ndm` and `.aux` auxiliary files from the germline reference in use with `receptor_utils`, replacing the ones shipped with IgBLAST.
 - [#407](https://github.com/nf-core/airrflow/pull/407) Added genotyping sub-workflow.
 - [#424](https://github.com/nf-core/airrflow/issues/424) Added support for AIRR-C germline reference.
 

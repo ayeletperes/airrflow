@@ -36,6 +36,10 @@
 
   > Ye J, Ma N, Madden TL, Ostell JM. (2013). IgBLAST: an immunoglobulin variable domain sequence analysis tool. Nucleic Acids Res.
 
+- [receptor_utils](https://pypi.org/project/receptor_utils/)
+
+  > Lees, W. Utilities for working with immune receptor sequences. Used, when `--generate_igblast_aux` is set, to derive the IgBLAST `.ndm` and `.aux` auxiliary files from the germline reference.
+
 - [Alakazam](https://doi.org/10.1126/scitranslmed.3008879)
 
   > Stern, J. N. H., Yaari, G., Vander Heiden, J. A., Church, G., Donahue, W. F., Hintzen, R. Q., … O’Connor, K. C. (2014). B cells populating the multiple sclerosis brain mature in the draining cervical lymph nodes. Science Translational Medicine, 6(248).

@@ -103,6 +103,10 @@ workflow INPUT_CHECK {
     }
 
     emit:
+    // Every sample's metadata, whatever the mode staged it as. Consumers that
+    // only need to know what is in the run take this rather than re-mixing the
+    // per-mode file channels.
+    meta = ch_reads.mix( ch_fasta, ch_tsv ).map { it -> it[0] } // channel: [ val(meta) ]
     reads = ch_reads // channel: [ val(meta), [ reads ] ], fastq mode only
     fasta = ch_fasta // channel: [ val(meta), fasta ], assembled mode only
     tsv = ch_tsv // channel: [ val(meta), tsv ], assembled mode only
@@ -124,7 +128,8 @@ def create_fastq_channels(LinkedHashMap col, collapseby, cloneby, index_file) {
     meta.cloneby_group      = col[cloneby]
     meta.filetype           = "fastq"
     meta.single_cell        = col.single_cell.toLowerCase()
-    meta.locus              = col.pcr_target_locus
+    meta.locus              = locusClass( col.pcr_target_locus )
+    meta.locus_restriction  = locusRestriction( col.pcr_target_locus )
     meta.single_end         = false
 
     def array = []
@@ -168,11 +173,42 @@ def get_meta (LinkedHashMap col) {
     meta.filetype = col.filetype
     meta.single_cell = col.single_cell
     meta.pcr_target_locus = col.pcr_target_locus
-    meta.locus = col.locus
+    meta.locus = locusClass( col.locus )
+    meta.locus_restriction = locusRestriction( col.pcr_target_locus )
 
     if (!file(col.filename).exists()) {
         error "ERROR: Please check input samplesheet: filename does not exist!\n${col.filename}"
     }
 
     return  [ meta, file(col.filename) ]
+}
+
+//
+// pcr_target_locus accepts either a receptor class (IG, TR) or a single locus
+// (IGH, IGK, IGL, TRA, TRB, TRG, TRD). The class is what IgBLAST and Change-O
+// work with; the single locus, when given, additionally restricts the germline
+// reference to that locus.
+//
+
+// The receptor class. Case is preserved from the samplesheet: meta.locus is
+// written verbatim into the FASTQ headers by PRESTO_PARSEHEADERS_METADATA, so
+// normalising it here would change published sequence headers.
+def locusClass(value) {
+    def raw = value?.toString()?.trim()
+    def key = raw?.toUpperCase()
+    if (key in ['IG', 'TR']) {
+        return raw
+    }
+    if (key in ['IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRG', 'TRD']) {
+        return raw.substring(0, 2)
+    }
+    error "ERROR: Please check input samplesheet -> pcr_target_locus '${value}' must be one of: IG, TR, IGH, IGK, IGL, TRA, TRB, TRG, TRD."
+}
+
+// The single locus to restrict the germline reference to, or null when the
+// samplesheet asked for the whole class. Always upper case: unlike meta.locus
+// this value never reaches a published file, it only keys the reference.
+def locusRestriction(value) {
+    def key = value?.toString()?.trim()?.toUpperCase()
+    return key in ['IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRG', 'TRD'] ? key : null
 }

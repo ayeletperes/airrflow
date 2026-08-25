@@ -134,6 +134,7 @@ workflow AIRRFLOW {
         buildconsensus_maxerror
         buildconsensus_maxgap
         primer_consensus
+        generate_igblast_aux
 
     main:
 
@@ -161,7 +162,9 @@ workflow AIRRFLOW {
         DATABASES(
             fetch_germlines,
             reference_igblast,
-            reference_fasta
+            reference_fasta,
+            generate_igblast_aux,
+            INPUT_CHECK.out.meta
         )
 
         if ( mode == "fastq" ) {
