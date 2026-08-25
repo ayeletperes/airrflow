@@ -16,12 +16,9 @@ done
 
 echo "Fetching databases with sourcerer (${DATABASE_TYPE})..."
 
-# Download each species into one reference tree. sourcerer writes the germline
-# FASTAs under <outdir>/reference_base/<species>/, so both species accumulate in
-# the same reference_base.
-for SPECIES in human mouse; do
-    sourcerer "${DATABASE_TYPE}" download "${SPECIES}" --outdir sourcerer_out
-done
+# 'all' is every species sourcerer supports for this source, in one call, with
+# provenance merged across them.
+sourcerer "${DATABASE_TYPE}" download all --outdir sourcerer_out
 mv sourcerer_out/reference_base reference_base
 
 # Build the IgBLAST databases from the reference tree. This cleans the FASTAs,

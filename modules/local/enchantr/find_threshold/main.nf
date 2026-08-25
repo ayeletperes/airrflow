@@ -14,7 +14,7 @@ process FIND_THRESHOLD {
     label 'immcantation'
     label 'immcantation_container'
 
-    container "docker.io/immcantation/airrflow:5.1.0"
+    container "docker.io/immcantation/airrflow:5.2.0dev"
 
 
     input:
