@@ -64,13 +64,13 @@ jobs:
         run: |
           nextflow run main.nf \
             -profile test_fetchimgt,docker \
-            -c tests/config/sourcerer_image.config \
+            \
             --outdir results_fetchimgt
       - name: Module fetch (airrc-imgt) via sourcerer
         run: |
           nextflow run main.nf \
             -profile test_fetch_airrc_imgt,docker \
-            -c tests/config/sourcerer_image.config \
+            \
             --outdir results_airrc
 
       # --- 2. custom reference directory via --reference_fasta/--reference_igblast ---
