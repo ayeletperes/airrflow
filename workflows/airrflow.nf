@@ -16,7 +16,7 @@ include { CHANGEO_CONVERTDB_FASTA as CHANGEO_CONVERTDB_FASTA_FROM_AIRR } from '.
 //
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
 //
-include { DATABASES                     } from '../subworkflows/local/databases'
+include { DATABASES ; withGermline     } from '../subworkflows/local/databases'
 include { SEQUENCE_ASSEMBLY             } from '../subworkflows/local/sequence_assembly'
 include { INPUT_CHECK                   } from '../subworkflows/local/input_check'
 include { VDJ_ANNOTATION                } from '../subworkflows/local/vdj_annotation'
@@ -236,7 +236,7 @@ workflow AIRRFLOW {
                 // Perform sequence assembly if input type is fastq from bulk sequencing data
                 SEQUENCE_ASSEMBLY(
                     INPUT_CHECK.out.reads,
-                    DATABASES.out.igblast.collect(),
+                    DATABASES.out.reference_by_key,
                     library_generation_method,
                     adapter_fasta,
                     maskprimers_extract,
@@ -329,8 +329,7 @@ workflow AIRRFLOW {
             ch_fasta,
             ch_tsv_files,
             ch_validated_samplesheet.collect(),
-            DATABASES.out.igblast.collect(),
-            DATABASES.out.reference_fasta.collect(),
+            DATABASES.out.reference_by_key,
             skip_alignment_filter,
             productive_only
         )
@@ -347,7 +346,7 @@ workflow AIRRFLOW {
 
         BULK_QC_AND_FILTER(
             ch_repertoire_by_processing.bulk,
-            VDJ_ANNOTATION.out.reference_fasta.collect(),
+            DATABASES.out.reference_by_key,
             remove_chimeric,
             detect_contamination,
             collapseby
@@ -369,8 +368,7 @@ workflow AIRRFLOW {
         // Novel alleles and genotype inference
         if (genotyping) {
             NOVEL_ALLELES_AND_GENOTYPING(
-                ch_repertoires_after_qc,
-                VDJ_ANNOTATION.out.reference_fasta.collect(),
+                withGermline( ch_repertoires_after_qc, DATABASES.out.reference_by_key, ['reference_fasta'] ),
                 ch_validated_samplesheet.collect(),
                 ch_report_logo_img.collect().ifEmpty([]),
                 genotypeby,
@@ -383,7 +381,7 @@ workflow AIRRFLOW {
             ch_repertoire_reference = NOVEL_ALLELES_AND_GENOTYPING.out.repertoire_reference
 
         } else {
-            ch_repertoire_reference = ch_repertoires_after_qc.combine(VDJ_ANNOTATION.out.reference_fasta)
+            ch_repertoire_reference = withGermline( ch_repertoires_after_qc, DATABASES.out.reference_by_key, ['reference_fasta'] )
         }
         ch_repertoire_reference.dump(tag: 'ch_repertoire_reference_forcloning')
 
@@ -409,7 +407,7 @@ workflow AIRRFLOW {
         if (translate || embeddings) {
             TRANSLATE_EMBED(
                 ch_repertoires_after_qc,
-                DATABASES.out.igblast.collect(),
+                DATABASES.out.reference_by_key,
                 embeddings,
                 embedding_chain
             )

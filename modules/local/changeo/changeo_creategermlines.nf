@@ -10,8 +10,7 @@ process CHANGEO_CREATEGERMLINES {
         'community.wave.seqera.io/library/changeo_igblast_wget:192e77f3b68daa50' }"
 
     input:
-    tuple val(meta), path(tab) // sequence tsv table in AIRR format
-    path(reference_fasta) // reference fasta
+    tuple val(meta), path(tab), path(reference_fasta) // sequence tsv table in AIRR format + reference fasta
 
     output:
     tuple val(meta), path("*germ-pass.tsv"), emit: tab

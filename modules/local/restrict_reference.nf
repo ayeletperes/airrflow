@@ -9,7 +9,7 @@ process RESTRICT_REFERENCE {
         'community.wave.seqera.io/library/changeo_igblast_wget:192e77f3b68daa50' }"
 
     input:
-    tuple val(meta), path(reference_base, stageAs: 'source_reference'), path(igblast_base, stageAs: 'source_igblast')
+    tuple val(meta), path(reference_base, stageAs: 'source_reference'), path(igblast_base, stageAs: 'source_igblast'), path(ggs_base)
     val database_type
 
     output:
@@ -17,11 +17,17 @@ process RESTRICT_REFERENCE {
     tuple val("${task.process}"), val('igblastn'), eval('igblastn -version | head -1 | grep -o "[0-9][0-9.]*"'), emit: versions_igblastn, topic: versions
 
     script:
+    def restriction = meta.locus_restriction ? "-l ${meta.locus_restriction}" : ''
+    // A personal germline set replaces the generic V/D/J of every locus it
+    // covers. --require-loci re-checks coverage here because a zipped set
+    // cannot be looked into when the samplesheet is read.
+    def ggs = ggs_base ? "-g ${ggs_base} --subject '${meta.ggs_subject}' --require-loci ${meta.required_loci}" : ''
     """
-    restrict_reference.py -r source_reference -l "${meta.locus_restriction}" -s "${meta.species}" -o reference_base
+    restrict_reference.py -r source_reference -s "${meta.species}" ${restriction} ${ggs} -o reference_base
 
     # Rebuild the canonical FASTAs and BLAST databases from what survived, so no
-    # gene outside the locus is left in a database.
+    # gene outside the locus, and no generic allele a germline set replaced, is
+    # left in a database.
     ref2igblast.sh -i reference_base -o igblast_base -d "${database_type}"
 
     # ref2igblast.sh does not produce the NCBI support trees; carry them over as

@@ -90,17 +90,24 @@ workflow CLONAL_ANALYSIS {
         }
     }
 
-    // merge all repertoires by cloneby metadata field
-    ch_repertoire_reference.map{ it -> [ it[0][cloneby],
-                                it[0].id,
-                                it[0].sample_id,
-                                it[0].subject_id,
-                                it[0].species,
-                                it[0].single_cell,
-                                it[0].locus,
+    // merge all repertoires by the cloneby metadata field and the effective locus:
+    // the locus the germline reference was restricted to, or the receptor class.
+    // Grouping on cloneby alone would put two loci of one subject, each with its
+    // own restricted reference, into a single clone group.
+    ch_repertoire_reference.map{ it ->
+                            def meta = it[0]
+                            def grouping_locus = (meta.grouping_locus ?: meta.locus_restriction ?: meta.locus).toUpperCase()
+                            [ meta[cloneby],
+                                grouping_locus,
+                                meta.id,
+                                meta.sample_id,
+                                meta.subject_id,
+                                meta.species,
+                                meta.single_cell,
+                                meta.locus,
                                 it[1],
                                 it[2] ] }
-                .groupTuple()
+                .groupTuple(by: [0,1])
                 .map{ get_meta_tabs(it, genotypeby, cloneby) }
                 .set{ ch_repertoire_grouped }
 
@@ -151,23 +158,33 @@ workflow CLONAL_ANALYSIS {
 }
 
 // Function to map
+// arr[0] cloneby value, arr[1] effective (grouping) locus, arr[2] sample meta.id,
+// arr[3] sample_id, arr[4] subject_id, arr[5] species, arr[6] single_cell,
+// arr[7] receptor class, arr[8] repertoire, arr[9] reference fasta.
 def get_meta_tabs(arr, genotypeby, cloneby) {
-    if (arr[3].unique().size() > 1) {
-            error "Multiple subject_id found for ${arr[0]} (${arr[3].join(', ')}). Please check your input parameters and ensure that all samples with the same 'cloneby' value have the same 'subject_id' value."
+    def clone_id = arr[0]
+    def grouping_locus = arr[1]
+
+    if (arr[4].unique().size() > 1) {
+            error "Multiple subject_id found for ${clone_id} (${arr[4].join(', ')}). Please check your input parameters and ensure that all samples with the same 'cloneby' value have the same 'subject_id' value."
     }
 
+    def locus_class = arr[7].unique().join("")
+
     def meta = [:]
-    meta.id                 = [arr[0]].unique().join("")
-    meta.sample_id          = arr[2].flatten()
-    meta.subject_id         = arr[3].unique().join("")
-    meta.species            = arr[4].unique().join("")
-    meta.single_cell        = arr[5].unique().join("")
-    meta.locus              = arr[6].unique().join("")
+    // Only suffix the id when the grouping locus actually narrowed the group,
+    // otherwise every existing clone-group output would be renamed for nothing.
+    meta.id                 = grouping_locus == locus_class.toUpperCase() ? clone_id.toString() : "${clone_id}_${grouping_locus}".toString()
+    meta.sample_id          = arr[3].flatten()
+    meta.subject_id         = arr[4].unique().join("")
+    meta.species            = arr[5].unique().join("")
+    meta.single_cell        = arr[6].unique().join("")
+    meta.locus              = locus_class
 
     def array = []
 
-        array = [ meta, arr[7].flatten(), arr[8].unique() ]
-        if (arr[8].size() > 1) {
+        array = [ meta, arr[8].flatten(), arr[9].unique() ]
+        if (arr[9].size() > 1) {
             error "Multiple reference fasta files found for ${meta.id}. Please check your input parameters and ensure that all samples with the same ${genotypeby} value (parameter 'genotype_by') have the same ${cloneby} value (parameter 'clone_by')."
         }
     return array

@@ -509,15 +509,19 @@ Parsing the logs from the previous processes. Summary of the number of sequences
 
 Copy of the downloaded germline reference database by the process `fetch_germlines`, used for the gene assignment step, only stored if `--save_germlines` is true.
 
-This folder is only present when `--fetch_germlines` is set, for example `--fetch_germlines imgt` or `--fetch_germlines airrc-imgt`. If databases are provided with `--reference_fasta` and `--reference_igblast` this folder will not be present.
+The downloaded copy is only present when `--fetch_germlines` is set, for example `--fetch_germlines imgt` or `--fetch_germlines airrc-imgt`. If databases are provided with `--reference_fasta` and `--reference_igblast` there is nothing to download and no copy is published.
 
 <details markdown="1">
 <summary>Output files</summary>
 
 - `germline_reference/`
   - Directory containing the downloaded germline reference in the `fetch_germlines` process.
+- `germline_reference/<key>/`
+  - One directory per germline reference that the run built for itself, rather than using the generic one. `<key>` is `gen_<species>_<locus>` for a reference restricted to a single locus (for example `gen_human_IGH`), and `ggs_<subject_id>_<locus>` for a subject's personal germline set. Each holds `reference_base/`, the reference FASTA tree, and `igblast_base/`, the IgBLAST databases built from it.
 
 </details>
+
+The whole folder is gated on `--save_germlines`, which is `true` by default. Set `--save_germlines false` to keep the references out of the results directory; they are still built and used.
 
 When `--generate_igblast_aux` is set, the IgBLAST `.ndm` and `.aux` auxiliary files are regenerated from this germline reference and replace the ones shipped with IgBLAST. The rebuilt IgBLAST database directory is used by the annotation steps but is not published, so this folder still holds the reference as it was downloaded.
 

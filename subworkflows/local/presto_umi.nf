@@ -38,6 +38,7 @@ include { PRESTO_COLLAPSESEQ    as PRESTO_COLLAPSESEQ_UMI             }    from 
 include { PRESTO_COLLAPSESEQ    as PRESTO_COLLAPSESEQ_ALIGN           }    from '../../modules/local/presto/presto_collapseseq'
 include { PRESTO_COLLAPSESEQ    as PRESTO_COLLAPSESEQ_CREGION         }    from '../../modules/local/presto/presto_collapseseq'
 include { PRESTO_SPLITSEQ       as PRESTO_SPLITSEQ_UMI                }    from '../../modules/local/presto/presto_splitseq'
+include { withGermline                                                 }    from './databases'
 
 
 workflow PRESTO_UMI {
@@ -47,7 +48,7 @@ workflow PRESTO_UMI {
     ch_vprimers    // channel: [ vprimers.fasta ]
     ch_adapter_fasta // channel: [ adapters.fasta ]
     ch_internal_cregion // channel: [ internal_cregions.fasta ]
-    ch_igblast
+    ch_reference_by_key // channel: [ val(key), path(igblast_base), path(reference_base) ]
     maskprimers_align_race
     umi_position
     cprimer_position
@@ -498,8 +499,7 @@ workflow PRESTO_UMI {
     if (assemblepairs_sequential){
         // Assemble read pairs sequential
         PRESTO_ASSEMBLEPAIRS_SEQUENTIAL (
-            PRESTO_POSTCONSENSUS_PAIRSEQ_UMI.out.reads,
-            ch_igblast.collect()
+            withGermline( PRESTO_POSTCONSENSUS_PAIRSEQ_UMI.out.reads, ch_reference_by_key, ['igblast'] )
         )
         ch_assemblepairs_reads = PRESTO_ASSEMBLEPAIRS_SEQUENTIAL.out.reads
         ch_assemblepairs_logs = PRESTO_ASSEMBLEPAIRS_SEQUENTIAL.out.logs

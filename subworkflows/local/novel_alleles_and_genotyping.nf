@@ -8,7 +8,6 @@ include { CLONAL_ASSIGNMENT as CLONAL_ASSIGNMENT_GENOTYPING } from '../../module
 workflow NOVEL_ALLELES_AND_GENOTYPING {
     take:
     ch_repertoire
-    ch_reference_fasta
     ch_validated_samplesheet
     ch_logo
     genotypeby
@@ -21,24 +20,28 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
     main:
     ch_logs = channel.empty()
 
-    // Flatten each repertoire into a tuple keyed by the genotypeby field and locus.
+    // Flatten each repertoire into a tuple keyed by the genotypeby field and the
+    // effective locus: the single locus the germline reference was restricted to,
+    // or the receptor class when the whole class was requested. Two samples of one
+    // subject restricted to different loci (IGH and IGK) carry different references
+    // and are independent genotype inferences, so they must not share a group.
     ch_repertoire
-        .combine(ch_reference_fasta)
         .map{ it ->
                 def meta = it[0]
                 def rep = it[1]
                 def ref = it[2]
                 def genotypeby_field = genotypeby=="sample_id" ? "id" : genotypeby
                 def genotype_id = meta[genotypeby_field]
-                def locus = meta.locus.toUpperCase()
+                def locus_class = meta.locus.toUpperCase()
+                def grouping_locus = (meta.locus_restriction ?: meta.locus).toUpperCase()
                 [ genotype_id,
-                                    locus,
+                                    grouping_locus,
                                     meta.id,
                                     meta.sample_id,
                                     meta.subject_id,
                                     meta.species,
                                     meta.single_cell,
-                                    meta.locus,
+                                    locus_class,
                                     rep,
                                     ref ] }
                     .set{ ch_repertoires_for_grouping }
@@ -157,25 +160,34 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
 }
 
 // Function to map
+// arr[0] genotypeby value, arr[1] effective (grouping) locus, arr[2] sample meta.id,
+// arr[3] sample_id, arr[4] subject_id, arr[5] species, arr[6] single_cell,
+// arr[7] receptor class (upper case), arr[8] repertoire, arr[9] reference fasta.
 def get_meta_tabs(arr) {
     def genotype_id = arr[0]
     def grouping_locus = arr[1]
 
-    if (!['IG', 'TR'].contains(grouping_locus)) {
-        error "Unsupported locus '${grouping_locus}' found for ${genotype_id}. Genotyping supports IG and TR loci only."
+    if (!['IG', 'TR', 'IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRG', 'TRD'].contains(grouping_locus)) {
+        error "Unsupported locus '${grouping_locus}' found for ${genotype_id}. Genotyping supports the IG and TR classes and the IGH, IGK, IGL, TRA, TRB, TRG and TRD loci only."
     }
 
     if (arr[4].unique().size() > 1) {
         error "Multiple subject IDs found for ${genotype_id} (${arr[4].join(', ')}). It is not possible to perform joint genotyping of samples from different subjects. Please check the 'genotypeby' parameter."
     }
 
+    def locus_class = arr[7].unique().join("")
+
     def meta = [:]
-    meta.id                 = "${genotype_id}_${grouping_locus}"
+    // Only suffix the id when the grouping locus actually narrowed the group,
+    // otherwise every existing published path would be renamed for nothing.
+    meta.id                 = grouping_locus == locus_class ? genotype_id.toString() : "${genotype_id}_${grouping_locus}".toString()
     meta.sample_id          = arr[3].flatten()
     meta.subject_id         = arr[4].unique().join("")
     meta.species            = arr[5].unique().join("")
     meta.single_cell        = arr[6].unique().join("")
-    meta.locus              = grouping_locus
+    // meta.locus stays the receptor class: the IG-only / TR-only branches above test it.
+    meta.locus              = locus_class
+    meta.grouping_locus     = grouping_locus
     def array = []
 
     array = [ meta, arr[8].flatten(), arr[9].unique() ]

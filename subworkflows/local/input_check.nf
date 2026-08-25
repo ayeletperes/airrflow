@@ -12,6 +12,7 @@ include { VALIDATE_INPUT                                   } from '../../modules
 include { CAT_FASTQ                                        } from '../../modules/nf-core/cat/fastq/main'
 include { RENAME_FILE as RENAME_FILE_FASTA                 } from '../../modules/local/rename_file'
 include { RENAME_FILE as RENAME_FILE_TSV                   } from '../../modules/local/rename_file'
+include { ggsSubjectMap                                    } from './utils_nfcore_airrflow_pipeline'
 
 workflow INPUT_CHECK {
     take:
@@ -33,12 +34,16 @@ workflow INPUT_CHECK {
     ch_fasta = channel.empty()
     ch_tsv   = channel.empty()
 
+    // Resolved once here rather than per row: it re-reads both samplesheets.
+    // It is validated in validateInputParameters(), so by now it is known good.
+    def ggs = ggsSubjectMap( params.ggs_input, params.input )
+
     if ( mode == "fastq" ) {
 
         SAMPLESHEET_CHECK ( samplesheet )
             .tsv
             .splitCsv ( header:true, sep:'\t' )
-            .map { create_fastq_channels(it, collapseby, cloneby, index_file) }
+            .map { create_fastq_channels(it, collapseby, cloneby, index_file, ggs) }
             .groupTuple(by: [0])
             .branch {
                 meta, fastqs ->
@@ -83,7 +88,7 @@ workflow INPUT_CHECK {
 
         ch_validated_samplesheet
             .splitCsv(header: true, sep:'\t')
-            .map { get_meta(it) }
+            .map { get_meta(it, ggs) }
                 .branch { it ->
                     fasta: it[0].filename =~ /[fasta|fa]$/
                     tsv:   it[0].filename =~ /tsv$/
@@ -116,7 +121,7 @@ workflow INPUT_CHECK {
 }
 
 // Function to map the raw (fastq) samplesheet
-def create_fastq_channels(LinkedHashMap col, collapseby, cloneby, index_file) {
+def create_fastq_channels(LinkedHashMap col, collapseby, cloneby, index_file, ggs) {
 
     def meta = [:]
 
@@ -131,6 +136,10 @@ def create_fastq_channels(LinkedHashMap col, collapseby, cloneby, index_file) {
     meta.locus              = locusClass( col.pcr_target_locus )
     meta.locus_restriction  = locusRestriction( col.pcr_target_locus )
     meta.single_end         = false
+    if (ggs[ col.subject_id?.toString() ]) {
+        meta.ggs_subject = col.subject_id.toString()
+        meta.ggs_path = ggs[ col.subject_id.toString() ]
+    }
 
     def array = []
     if (!file(col.filename_R1).exists()) {
@@ -157,7 +166,7 @@ def create_fastq_channels(LinkedHashMap col, collapseby, cloneby, index_file) {
 }
 
 // Function to map the validated (assembled) samplesheet
-def get_meta (LinkedHashMap col) {
+def get_meta (LinkedHashMap col, ggs) {
 
     def meta = [:]
 
@@ -175,6 +184,10 @@ def get_meta (LinkedHashMap col) {
     meta.pcr_target_locus = col.pcr_target_locus
     meta.locus = locusClass( col.locus )
     meta.locus_restriction = locusRestriction( col.pcr_target_locus )
+    if (ggs[ col.subject_id?.toString() ]) {
+        meta.ggs_subject = col.subject_id.toString()
+        meta.ggs_path = ggs[ col.subject_id.toString() ]
+    }
 
     if (!file(col.filename).exists()) {
         error "ERROR: Please check input samplesheet: filename does not exist!\n${col.filename}"
@@ -190,24 +203,26 @@ def get_meta (LinkedHashMap col) {
 // reference to that locus.
 //
 
-// The receptor class. Case is preserved from the samplesheet: meta.locus is
-// written verbatim into the FASTQ headers by PRESTO_PARSEHEADERS_METADATA, so
-// normalising it here would change published sequence headers.
+// pcr_target_locus accepts a receptor class (IG, TR) or a single locus.
+// The class is what IgBLAST and Change-O work with; the single locus, when
+// given, additionally restricts the germline reference to it.
+//
+// The locus list is repeated rather than held in a shared map: a top-level
+// `def` is not legal in a Nextflow script, and a map inside each function is
+// the same size as the list it would replace.
+
+// Case is preserved: meta.locus is written verbatim into the FASTQ headers by
+// PRESTO_PARSEHEADERS_METADATA, so normalising it would change published output.
 def locusClass(value) {
     def raw = value?.toString()?.trim()
     def key = raw?.toUpperCase()
-    if (key in ['IG', 'TR']) {
-        return raw
-    }
-    if (key in ['IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRG', 'TRD']) {
-        return raw.substring(0, 2)
-    }
+    if (key in ['IG', 'TR']) { return raw }
+    if (key in ['IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRG', 'TRD']) { return raw.substring(0, 2) }
     error "ERROR: Please check input samplesheet -> pcr_target_locus '${value}' must be one of: IG, TR, IGH, IGK, IGL, TRA, TRB, TRG, TRD."
 }
 
-// The single locus to restrict the germline reference to, or null when the
-// samplesheet asked for the whole class. Always upper case: unlike meta.locus
-// this value never reaches a published file, it only keys the reference.
+// The single locus to restrict the reference to, or null for a whole class.
+// Always upper case: it only ever keys a reference, it reaches no published file.
 def locusRestriction(value) {
     def key = value?.toString()?.trim()?.toUpperCase()
     return key in ['IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRG', 'TRD'] ? key : null

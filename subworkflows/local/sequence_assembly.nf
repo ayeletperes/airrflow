@@ -37,7 +37,7 @@ workflow SEQUENCE_ASSEMBLY {
 
     take:
     ch_reads // channel: [ val(meta), [ reads ] ]
-    ch_igblast
+    ch_reference_by_key // channel: [ val(key), path(igblast_base), path(reference_base) ]
     library_generation_method
     adapter_fasta
     maskprimers_extract
@@ -241,7 +241,7 @@ workflow SEQUENCE_ASSEMBLY {
             ch_vprimers_fasta,
             ch_adapter_fasta,
             ch_internal_cregion,
-            ch_igblast.collect(),
+            ch_reference_by_key,
             maskprimers_align_race,
             umi_position,
             cprimer_position,

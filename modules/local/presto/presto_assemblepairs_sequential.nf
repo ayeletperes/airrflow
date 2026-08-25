@@ -9,8 +9,7 @@ process PRESTO_ASSEMBLEPAIRS_SEQUENTIAL {
         'community.wave.seqera.io/library/igblast_presto_biopython_wget:688a053e4779d278' }"
 
     input:
-    tuple val(meta), path(R1), path(R2) // reads in fastq format
-    path(igblast) // igblast references
+    tuple val(meta), path(R1), path(R2), path(igblast) // reads in fastq format + igblast references
 
     output:
     tuple val(meta), path("*_assemble-pass.fastq"), emit: reads

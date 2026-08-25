@@ -5,6 +5,7 @@ include { CHANGEO_PARSEDB_SPLIT } from '../../modules/local/changeo/changeo_pars
 include { FILTER_QUALITY  } from '../../modules/local/reveal/filter_quality'
 include { FILTER_JUNCTION_MOD3  } from '../../modules/local/reveal/filter_junction_mod3'
 include { ADD_META_TO_TAB  } from '../../modules/local/reveal/add_meta_to_tab'
+include { withGermline } from './databases'
 
 
 workflow VDJ_ANNOTATION {
@@ -13,8 +14,7 @@ workflow VDJ_ANNOTATION {
     ch_fasta // [meta, fasta]
     ch_tsv // [meta, tsv]
     ch_validated_samplesheet
-    ch_igblast
-    ch_reference_fasta
+    ch_reference_by_key // channel: [ val(key), path(igblast_base), path(reference_base) ]
     skip_alignment_filter
     productive_only
 
@@ -22,16 +22,17 @@ workflow VDJ_ANNOTATION {
     ch_logs = channel.empty()
 
     CHANGEO_ASSIGNGENES (
-        ch_fasta,
-        ch_igblast.collect()
+        withGermline( ch_fasta, ch_reference_by_key, ['igblast'] )
     )
 
     ch_logs = ch_logs.mix(CHANGEO_ASSIGNGENES.out.logs)
 
+    // join, not positional pairing: the reference is attached with combine(by: 0),
+    // which preserves order within a key but not across keys, so a bare .fmt7
+    // channel could otherwise be matched to another sample's reads.
     CHANGEO_MAKEDB (
-        CHANGEO_ASSIGNGENES.out.fasta,
-        CHANGEO_ASSIGNGENES.out.blast,
-        ch_reference_fasta.collect()
+        withGermline( CHANGEO_ASSIGNGENES.out.fasta, ch_reference_by_key, ['igblast', 'reference_fasta'] )
+            .join( CHANGEO_ASSIGNGENES.out.blast )
     )
     ch_logs = ch_logs.mix(CHANGEO_MAKEDB.out.logs)
 
@@ -79,8 +80,6 @@ workflow VDJ_ANNOTATION {
 
     emit:
     repertoire = ADD_META_TO_TAB.out.tab
-    reference_fasta = ch_reference_fasta
-    reference_igblast = ch_igblast
     changeo_makedb_logs = ch_assignment_logs
     logs = ch_logs
 

@@ -3,19 +3,29 @@ include { AMULETY_EMBED  as AMULETY_EMBED_ANTIBERTY} from '../../modules/nf-core
 include { AMULETY_EMBED  as AMULETY_EMBED_ANTIBERTA2} from '../../modules/nf-core/amulety/embed/main'
 include { AMULETY_EMBED  as AMULETY_EMBED_ESM2} from '../../modules/nf-core/amulety/embed/main'
 include { AMULETY_EMBED  as AMULETY_EMBED_BALMPAIRED} from '../../modules/nf-core/amulety/embed/main'
+include { withGermline } from './databases'
 
 workflow TRANSLATE_EMBED {
     take:
     ch_repertoire
-    ch_reference_igblast
+    ch_reference_by_key // channel: [ val(key), path(igblast_base), path(reference_base) ]
     embeddings
     embedding_chain
 
     main:
 
+    // AMULETY_TRANSLATE is an nf-core module and takes the reference as a separate
+    // broadcast input, so split the per-sample reference back out of the tuple.
+    withGermline( ch_repertoire, ch_reference_by_key, ['igblast'] )
+        .multiMap { meta, tab, igblast ->
+            repertoire: [ meta, tab ]
+            igblast: igblast
+        }
+        .set { ch_translate }
+
     AMULETY_TRANSLATE(
-        ch_repertoire,
-        ch_reference_igblast
+        ch_translate.repertoire,
+        ch_translate.igblast
     )
 
     if (embeddings && embeddings.split(',').contains('antiberty') ){

@@ -35,6 +35,7 @@ params {
 
     // Input parameters
     input: String? = null
+    ggs_input: String? = null
     mode: String = "fastq"
     miairr: String = "$projectDir/assets/reveal/mapping_MiAIRR_BioSample_v1.3.1.tsv"
     index_file: Boolean = false

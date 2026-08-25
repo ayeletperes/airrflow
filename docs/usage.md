@@ -165,7 +165,7 @@ The required input file for processing raw BCR or TCR bulk targeted sequencing d
 - `subject_id`: Subject ID assigned by submitter, unique within study.
 - `species`: species from which the sample was taken. Supported species are `human` and `mouse`.
 - `tissue`: tissue from which the sample was taken. E.g. `blood`, `PBMC`, `brain`.
-- `pcr_target_locus`: Designation of the target locus (`IG` or `TR`).
+- `pcr_target_locus`: Designation of the target locus. Either a receptor class (`IG`, `TR`) or a single locus (`IGH`, `IGK`, `IGL`, `TRA`, `TRB`, `TRG`, `TRD`). Naming a single locus additionally restricts the germline reference used for that sample to that locus, see [Restricting the reference to a single locus](#restricting-the-reference-to-a-single-locus).
 - `biomaterial_provider`: Institution / research group that provided the samples.
 - `sex`: Subject biological sex (`female`, `male`, etc.).
 - `age`: Subject biological age.
@@ -223,6 +223,36 @@ An example samplesheet is:
 | sc5p_v2_hs_PBMC_1k_b_airr_rearrangement.tsv | human   | subject_x  | sc5p_v2_hs_PBMC_1k_5fb | PBMC   | NA   | NA  | 10x Genomics         | IG               | TRUE        |
 | bulk-Laserson-2014.fasta                    | human   | PGP1       | PGP1                   | PBMC   | male | NA  | Laserson-2014        | IG               | FALSE       |
 
+### Restricting the reference to a single locus
+
+The `pcr_target_locus` column accepts either a receptor class (`IG`, `TR`) or a single locus (`IGH`, `IGK`, `IGL`, `TRA`, `TRB`, `TRG`, `TRD`). When a single locus is given, the germline reference used for that sample is restricted to that locus: the FASTAs of the other chains are dropped and the BLAST databases are rebuilt from what is left, so no gene outside the locus can be assigned. An example samplesheet mixing the two forms is:
+
+| filename                                    | species | subject_id | sample_id              | tissue | sex  | age | biomaterial_provider | pcr_target_locus | single_cell |
+| ------------------------------------------- | ------- | ---------- | ---------------------- | ------ | ---- | --- | -------------------- | ---------------- | ----------- |
+| sc5p_v2_hs_PBMC_1k_b_airr_rearrangement.tsv | human   | subject_x  | sc5p_v2_hs_PBMC_1k_5fb | PBMC   | NA   | NA  | 10x Genomics         | IGH              | TRUE        |
+| bulk-Laserson-2014.fasta                    | human   | PGP1       | PGP1                   | PBMC   | male | NA  | Laserson-2014        | IGK              | FALSE       |
+
+- `IG` or `TR`: the receptor class. Nothing is restricted and the run behaves exactly as it did before this feature existed — the full reference is used and no extra process runs.
+- `IGH`, `IGK`, `IGL`, `TRA`, `TRB`, `TRG`, `TRD`: a single locus. The reference is restricted to that locus, and to the sample's `species`.
+- Class D genes are always retained, whichever locus is named. `IGK`, `IGL`, `TRA` and `TRG` have no D genes of their own, and `AssignGenes.py --ddb` is not optional, so an `IGK`-restricted run sees exactly the D genes an `IG` run already gives it.
+- One reference is built per distinct `(species, locus)` pair, not per sample. Ten `IGH` samples across five subjects share a single build.
+
+### Per-subject germline sets
+
+A personal germline set can be supplied per subject with `--ggs_input`, a second samplesheet in TSV format (tab separated). The columns `subject_id` and `ggs_path` are required. An example is:
+
+| subject_id | ggs_path                      |
+| ---------- | ----------------------------- |
+| CE0007908  | /data/germline_sets/CE0007908 |
+| CE0006623  | /data/germline_sets/CE0006623 |
+
+- `subject_id`: Subject ID, matching the `subject_id` column of the main input samplesheet.
+- `ggs_path`: path to a directory holding that subject's personal germline set, laid out as `<subject_id>/<locus>/*.fasta`. Each locus directory holds `V_asc.fasta`, `J_asc.fasta` and `V_gapped_asc.fasta` (the IMGT-gapped V sequences), plus `D_asc.fasta` for the loci that have D genes.
+
+The personal germline set is a **full replacement**, not a merge: for the subjects listed, the generic reference is not used at all, and only the alleles in the personal set can be assigned. Subjects absent from `--ggs_input` are unaffected and keep the generic reference, so the two can be mixed in one run.
+
+Every locus that a subject's samples declare in `pcr_target_locus` must be covered by that subject's germline set directory, or the run fails at validation. A subject whose samples declare the `IG` class needs `IGH`, `IGK` and `IGL`; a subject whose samples declare only `IGH` needs only `IGH`.
+
 ### Supported AIRR metadata fields
 
 nf-core/airrflow offers full support for the [AIRR standards 1.4](https://docs.airr-community.org/en/stable/datarep/metadata.html) metadata annotation. The minimum metadata fields that are needed by the pipeline are listed in the table below. Other non-mandatory AIRR fields can be provided in the input samplesheet, which will be available for reporting and introducing comparisons among repertoires.
@@ -233,7 +263,7 @@ nf-core/airrflow offers full support for the [AIRR standards 1.4](https://docs.a
 | subject_id                | Samplesheet column |                               | Subject ID assigned by submitter, unique within study |
 | species                   | Samplesheet column |                               | Subject species                                       |
 | tissue                    | Samplesheet column |                               | Sample tissue                                         |
-| pcr_target_locus          | Samplesheet column |                               | Designation of the target locus (IG or TR)            |
+| pcr_target_locus          | Samplesheet column |                               | Target locus: a class (IG, TR) or a single locus      |
 | sex                       | Samplesheet column |                               | Subject sex                                           |
 | age                       | Samplesheet column |                               | Subject age                                           |
 | biomaterial_provider      | Samplesheet column |                               | Name of sample biomaterial provider                   |

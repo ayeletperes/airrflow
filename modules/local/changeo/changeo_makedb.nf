@@ -10,9 +10,7 @@ process CHANGEO_MAKEDB {
         'community.wave.seqera.io/library/changeo_igblast_wget:192e77f3b68daa50' }"
 
     input:
-    tuple val(meta), path(reads) // reads in fasta format
-    path(igblast) // igblast fasta from ch_igblast_db_for_process_igblast.mix(ch_igblast_db_for_process_igblast_mix).collect()
-    path(reference_fasta)
+    tuple val(meta), path(reads), path(igblast_base), path(reference_fasta), path(blast_result) // reads, igblast and germline references, and the AssignGenes .fmt7
 
     output:
     tuple val(meta), path("*db-pass.tsv"), emit: tab //sequence table in AIRR format
@@ -24,7 +22,7 @@ process CHANGEO_MAKEDB {
     def args = task.ext.args ?: ''
     def partial = meta.species.toLowerCase()=='mouse' && meta.locus.toLowerCase()=='tr'  ? '--partial' : ''
     """
-    MakeDb.py igblast -i $igblast -s $reads -r \\
+    MakeDb.py igblast -i $blast_result -s $reads -r \\
     ${reference_fasta}/${meta.species.toLowerCase()}/vdj/ \\
     --nproc ${task.cpus} \\
     $args $partial \\

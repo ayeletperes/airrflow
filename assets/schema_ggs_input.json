@@ -1,0 +1,23 @@
+{
+    "$schema": "https://json-schema.org/draft/2020-12/schema",
+    "$id": "https://raw.githubusercontent.com/nf-core/airrflow/master/assets/schema_ggs_input.json",
+    "title": "nf-core/airrflow pipeline - params.ggs_input schema",
+    "description": "Schema for the file provided with params.ggs_input",
+    "type": "array",
+    "items": {
+        "type": "object",
+        "properties": {
+            "subject_id": {
+                "type": ["string", "number"],
+                "pattern": "^\\S+$",
+                "errorMessage": "Subject name must be provided and cannot contain spaces."
+            },
+            "ggs_path": {
+                "type": "string",
+                "pattern": "^\\S+$",
+                "errorMessage": "Path to the subject's genomic germline set must be provided and cannot contain spaces. It is either a directory laid out as <locus>/*.fasta, or a .zip of one."
+            }
+        },
+        "required": ["subject_id", "ggs_path"]
+    }
+}

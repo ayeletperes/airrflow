@@ -102,8 +102,6 @@ def main():
     p.add_argument("-i", "--igblast", type=Path, help="igblast_base to copy and update")
     p.add_argument("-r", "--reference", type=Path, help="reference_base with <species>/vdj")
     p.add_argument("-o", "--out", type=Path, default=Path("igblast_base"))
-    p.add_argument("-c", "--cdr-coords", default="79,114,166,195,313",
-                   help="IMGT CDR coordinates for make_igblast_ndm")
     p.add_argument("--self-test", action="store_true")
     a = p.parse_args()
 
@@ -111,7 +109,7 @@ def main():
         return self_test()
     if not a.igblast or not a.reference:
         p.error("-i and -r are required")
-    cdr_coords = [int(x) for x in a.cdr_coords.split(",")]
+    cdr_coords = [79, 114, 166, 195, 313]   # IMGT numbering
 
     shutil.copytree(a.igblast, a.out, symlinks=True, dirs_exist_ok=True)
     work = a.out / ".aux_work"

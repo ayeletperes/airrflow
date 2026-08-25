@@ -1,0 +1,45 @@
+nextflow_pipeline {
+
+    name "Test pipeline"
+    script "../main.nf"
+    // Not tagged "pipeline": this one needs a container with receptor_utils, so
+    // the main matrix excludes it and it is run with `nf-test test --tag ggs`.
+    tag "ggs"
+    profile "test_ggs"
+
+    test("-profile test_ggs") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+            }
+        }
+
+        then {
+            // stable_name: All files + folders in ${params.outdir}/ with a stable name
+            def stable_name = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}'])
+            // stable_path: All files in ${params.outdir}/ with stable content
+            def stable_path = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
+            // The mixed path: the subject with a personal set gets its own
+            // reference, the subject without stays on the generic one, so exactly
+            // one personal reference is built.
+            def references = new File("$outputDir/germline_reference").list().findAll { it.startsWith('ggs_') }.sort()
+            assertAll(
+                { assert workflow.success},
+                { assert references == ['ggs_CE0007908_IG'] },
+                { assert snapshot(
+                    // Number of successful tasks
+                    workflow.trace.succeeded().size(),
+                    // pipeline versions.yml file for multiqc from which Nextflow version is removed because we test pipelines on multiple Nextflow versions
+                    removeNextflowVersion("$outputDir/pipeline_info/nf_core_airrflow_software_mqc_versions.yml"),
+                    // All stable path name, with a relative path
+                    stable_name,
+                    // All files with stable contents
+                    stable_path,
+                    // Additional files that are excluded in .nftignore but need to be checked
+                    "$outputDir/repertoire_comparison/Sequence_numbers_summary/Table_sequences_assembled.tsv"
+                ).match() }
+            )
+        }
+    }
+}

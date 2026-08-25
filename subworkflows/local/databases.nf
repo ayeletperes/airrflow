@@ -4,6 +4,8 @@ include { UNZIP_DB as UNZIP_REFERENCE_FASTA } from '../../modules/local/unzip_db
 include { VALIDATE_IGBLAST_DB } from '../../modules/local/validate_igblast_db'
 include { MAKE_IGBLAST_AUX } from '../../modules/local/make_igblast_aux'
 include { RESTRICT_REFERENCE } from '../../modules/local/restrict_reference'
+include { UNZIP_DB as UNZIP_GGS } from '../../modules/local/unzip_db'
+include { classLoci } from './utils_nfcore_airrflow_pipeline'
 
 workflow DATABASES {
 
@@ -74,29 +76,63 @@ workflow DATABASES {
     ch_generic = ch_igblast.combine( ch_reference_fasta )
 
     ch_meta
-        .map { meta -> [ germlineKey(meta), meta.species, meta.locus, meta.locus_restriction ] }
+        .map { meta -> [ germlineKey(meta), meta.species, meta.locus, meta.locus_restriction,
+                            meta.ggs_path, meta.ggs_subject ] }
         .unique { row -> row[0] }
-        .branch { _key, _species, _locus, restriction ->
-            build: restriction != null
+        .branch { _key, _species, _locus, restriction, ggs, _subject ->
+            build: restriction != null || ggs != null
             generic: true
         }
         .set { ch_key_lanes }
 
     ch_key_lanes.generic
         .combine( ch_generic )
-        .map { key, _species, _locus, _restriction, igblast, reference ->
+        .map { key, _species, _locus, _restriction, _ggs, _subject, igblast, reference ->
             [ key, igblast, reference ]
         }
         .set { ch_generic_by_key }
 
-    RESTRICT_REFERENCE(
-        ch_key_lanes.build
-            .map { key, species, locus, restriction ->
-                [ [ id: key.replaceAll(':', '_'), key: key, species: species,
-                    locus: locus, locus_restriction: restriction ] ]
+    ch_build = ch_key_lanes.build
+        .map { key, species, locus, restriction, ggs, subject ->
+            def meta = [ id: key.replaceAll(':', '_'), key: key, species: species,
+                            locus: locus, locus_restriction: restriction ]
+            if (ggs) {
+                meta.ggs_subject = subject
+                // Checked here as well as in the samplesheet: a zipped germline
+                // set cannot be looked into at construction time.
+                meta.required_loci = classLoci( restriction ?: locus ).join(',')
             }
+            [ meta, ggs ?: [] ]
+        }
+
+    // A germline set given as a directory is staged as it stands. A .zip is
+    // unpacked first -- Nextflow cannot list a directory over https, so an
+    // archive is the only form a remote germline set can take. UNZIP_DB names
+    // its output after the archive, which is also how each build finds its own.
+    if (params.ggs_input) {
+        ch_build
+            .branch { _meta, ggs ->
+                zipped: ggs.toString().endsWith('.zip')
+                ready: true
+            }
+            .set { ch_ggs_lanes }
+
+        UNZIP_GGS( ch_ggs_lanes.zipped.map { _meta, ggs -> file(ggs) }.unique() )
+
+        ch_build = ch_ggs_lanes.ready
+            .map { meta, ggs -> [ meta, ggs ? file(ggs) : [] ] }
+            .mix(
+                ch_ggs_lanes.zipped
+                    .map { meta, ggs -> [ file(ggs).simpleName, meta ] }
+                    .combine( UNZIP_GGS.out.unzipped.map { dir -> [ dir.name, dir ] }, by: 0 )
+                    .map { _name, meta, dir -> [ meta, dir ] }
+            )
+    }
+
+    RESTRICT_REFERENCE(
+        ch_build
             .combine( ch_generic )
-            .map { meta, igblast, reference -> [ meta, reference, igblast ] },
+            .map { meta, ggs, igblast, reference -> [ meta, reference, igblast, ggs ] },
         fetch_germlines == 'airrc-imgt' ? 'airrc-imgt' : 'imgt'
     )
 
@@ -105,7 +141,6 @@ workflow DATABASES {
         .set { ch_built_by_key }
 
     emit:
-    reference_fasta = ch_reference_fasta
     igblast = ch_igblast
     // channel: [ val(key), path(igblast_base), path(reference_base) ]
     reference_by_key = ch_generic_by_key.mix( ch_built_by_key )
@@ -137,15 +172,12 @@ def germlineKey(meta) {
 // [meta, tab], [meta, R1, R2] and [meta] alike.
 //
 def withGermline(ch_items, ch_by_key, kinds) {
-    def index = [ 'igblast': 1, 'reference_fasta': 2 ]
-
     return ch_items
         .map { it -> [ germlineKey(it[0]), it ] }
         .combine( ch_by_key, by: 0 )
-        .map { entry ->
-            def item = entry[1]
-            def refs = entry[2..-1]
-            item + kinds.collect { kind -> refs[ index[kind] - 1 ] }
+        .map { _key, item, igblast, reference ->
+            def refs = [ igblast: igblast, reference_fasta: reference ]
+            item + kinds.collect { kind -> refs[kind] }
         }
 }
 
