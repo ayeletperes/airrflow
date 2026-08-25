@@ -21,7 +21,7 @@ process REASSIGN_ALLELES {
     val outputby // which field to use for output
 
     output:
-    tuple val(meta), path("*/*/*reassign-pass.tsv"), emit: tab // reassigned repertoire
+    tuple val(meta), path("*/*/*reassign-pass.tsv*"), emit: tab // reassigned repertoire, .tsv or .tsv.gz
     path("*/*_command_log.txt"), emit: logs //process logs
     path "*_report"
     tuple val("${task.process}"), val('enchantr'), eval('Rscript -e "library(enchantr); cat(as.character(packageVersion(\'enchantr\')))"'), emit: versions_enchantr, topic: versions

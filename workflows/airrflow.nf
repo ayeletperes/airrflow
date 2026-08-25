@@ -16,7 +16,7 @@ include { CHANGEO_CONVERTDB_FASTA as CHANGEO_CONVERTDB_FASTA_FROM_AIRR } from '.
 //
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
 //
-include { DATABASES ; withGermline     } from '../subworkflows/local/databases'
+include { DATABASES ; germlineKey      } from '../subworkflows/local/databases'
 include { SEQUENCE_ASSEMBLY             } from '../subworkflows/local/sequence_assembly'
 include { INPUT_CHECK                   } from '../subworkflows/local/input_check'
 include { VDJ_ANNOTATION                } from '../subworkflows/local/vdj_annotation'
@@ -368,7 +368,10 @@ workflow AIRRFLOW {
         // Novel alleles and genotype inference
         if (genotyping) {
             NOVEL_ALLELES_AND_GENOTYPING(
-                withGermline( ch_repertoires_after_qc, DATABASES.out.reference_by_key, ['reference_fasta'] ),
+                ch_repertoires_after_qc
+                    .map { meta, tab -> [ germlineKey(meta), meta, tab ] }
+                    .combine( DATABASES.out.reference_by_key, by: 0 )
+                    .map { _key, meta, tab, _igblast, reference -> [ meta, tab, reference ] },
                 ch_validated_samplesheet.collect(),
                 ch_report_logo_img.collect().ifEmpty([]),
                 genotypeby,
@@ -381,7 +384,10 @@ workflow AIRRFLOW {
             ch_repertoire_reference = NOVEL_ALLELES_AND_GENOTYPING.out.repertoire_reference
 
         } else {
-            ch_repertoire_reference = withGermline( ch_repertoires_after_qc, DATABASES.out.reference_by_key, ['reference_fasta'] )
+            ch_repertoire_reference = ch_repertoires_after_qc
+                    .map { meta, tab -> [ germlineKey(meta), meta, tab ] }
+                    .combine( DATABASES.out.reference_by_key, by: 0 )
+                    .map { _key, meta, tab, _igblast, reference -> [ meta, tab, reference ] }
         }
         ch_repertoire_reference.dump(tag: 'ch_repertoire_reference_forcloning')
 

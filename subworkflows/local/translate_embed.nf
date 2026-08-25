@@ -3,7 +3,7 @@ include { AMULETY_EMBED  as AMULETY_EMBED_ANTIBERTY} from '../../modules/nf-core
 include { AMULETY_EMBED  as AMULETY_EMBED_ANTIBERTA2} from '../../modules/nf-core/amulety/embed/main'
 include { AMULETY_EMBED  as AMULETY_EMBED_ESM2} from '../../modules/nf-core/amulety/embed/main'
 include { AMULETY_EMBED  as AMULETY_EMBED_BALMPAIRED} from '../../modules/nf-core/amulety/embed/main'
-include { withGermline } from './databases'
+include { germlineKey } from './databases'
 
 workflow TRANSLATE_EMBED {
     take:
@@ -16,8 +16,10 @@ workflow TRANSLATE_EMBED {
 
     // AMULETY_TRANSLATE is an nf-core module and takes the reference as a separate
     // broadcast input, so split the per-sample reference back out of the tuple.
-    withGermline( ch_repertoire, ch_reference_by_key, ['igblast'] )
-        .multiMap { meta, tab, igblast ->
+    ch_repertoire
+        .map { meta, tab -> [ germlineKey(meta), meta, tab ] }
+        .combine( ch_reference_by_key, by: 0 )
+        .multiMap { _key, meta, tab, igblast, _reference ->
             repertoire: [ meta, tab ]
             igblast: igblast
         }

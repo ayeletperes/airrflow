@@ -6,13 +6,14 @@
  * locus, subject_id) is available to every downstream subworkflow.
  */
 
+include { samplesheetToList                                } from 'plugin/nf-schema'
 include { SAMPLESHEET_CHECK                                } from '../../modules/local/samplesheet_check'
 include { SAMPLESHEET_CHECK as SAMPLESHEET_CHECK_ASSEMBLED } from '../../modules/local/samplesheet_check'
 include { VALIDATE_INPUT                                   } from '../../modules/local/enchantr/validate_input'
 include { CAT_FASTQ                                        } from '../../modules/nf-core/cat/fastq/main'
 include { RENAME_FILE as RENAME_FILE_FASTA                 } from '../../modules/local/rename_file'
 include { RENAME_FILE as RENAME_FILE_TSV                   } from '../../modules/local/rename_file'
-include { ggsSubjectMap                                    } from './utils_nfcore_airrflow_pipeline'
+
 
 workflow INPUT_CHECK {
     take:
@@ -139,6 +140,7 @@ def create_fastq_channels(LinkedHashMap col, collapseby, cloneby, index_file, gg
     if (ggs[ col.subject_id?.toString() ]) {
         meta.ggs_subject = col.subject_id.toString()
         meta.ggs_path = ggs[ col.subject_id.toString() ]
+        meta.required_loci = classLoci( col.pcr_target_locus ).join(',')
     }
 
     def array = []
@@ -187,6 +189,7 @@ def get_meta (LinkedHashMap col, ggs) {
     if (ggs[ col.subject_id?.toString() ]) {
         meta.ggs_subject = col.subject_id.toString()
         meta.ggs_path = ggs[ col.subject_id.toString() ]
+        meta.required_loci = classLoci( col.pcr_target_locus ).join(',')
     }
 
     if (!file(col.filename).exists()) {
@@ -226,4 +229,81 @@ def locusClass(value) {
 def locusRestriction(value) {
     def key = value?.toString()?.trim()?.toUpperCase()
     return key in ['IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRG', 'TRD'] ? key : null
+}
+
+// The loci a pcr_target_locus value needs genes for: a whole class needs all of
+// its loci, a single locus needs only itself.
+def classLoci(target) {
+    def key = target?.toString()?.trim()?.toUpperCase()
+    def whole = [ 'IG': ['IGH', 'IGK', 'IGL'], 'TR': ['TRA', 'TRB', 'TRG', 'TRD'] ]
+    return whole.containsKey(key) ? whole[key] : [ key ]
+}
+
+// The personal germline set each subject uses, keyed by subject id. Read at
+// workflow construction, so a set that does not match the run stops it before
+// any task is submitted. A .zip cannot be inspected here; RESTRICT_REFERENCE
+// re-checks its coverage.
+def ggsSubjectMap(ggs_input, input) {
+    if (!ggs_input) {
+        return [:]
+    }
+    if (!input) {
+        error("--ggs_input was given without --input; there is no run for the germline sets to apply to.")
+    }
+
+    def ggs = [:]
+    samplesheetToList(ggs_input, "${projectDir}/assets/schema_ggs_input.json").each { row ->
+        def subject = row[0].toString()
+        if (ggs.containsKey(subject)) {
+            error("--ggs_input: subject '${subject}' appears more than once; one row per subject.")
+        }
+        ggs[subject] = row[1].toString()
+    }
+
+    // A zipped germline set is matched back to its build by file name, so two
+    // subjects whose archives share one would swap germline sets in silence.
+    def clash = ggs.values()
+        .findAll { path -> path.endsWith('.zip') }
+        .countBy { path -> file(path).simpleName }
+        .find { _name, count -> count > 1 }
+    if (clash) {
+        error("--ggs_input: zipped germline sets must have distinct file names; '${clash.key}.zip' is used by more than one subject.")
+    }
+
+    def species = [:]
+    def loci = [:]
+    file(input).splitCsv(header: true, sep: '\t').each { row ->
+        def subject = row.subject_id?.toString()
+        if (ggs.containsKey(subject)) {
+            species[subject] = (species[subject] ?: [] as Set) + [ row.species?.toString() ]
+            loci[subject] = (loci[subject] ?: [] as Set) + classLoci(row.pcr_target_locus)
+        }
+    }
+
+    ggs.each { subject, path ->
+        if (!loci.containsKey(subject)) {
+            error("--ggs_input: subject '${subject}' is not in --input.")
+        }
+        if (species[subject].size() > 1) {
+            error("--ggs_input: subject '${subject}' has samples from more than one species (${species[subject].sort().join(', ')}); a personal germline set is built for one species.")
+        }
+        if (!path.endsWith('.zip')) {
+            def dir = file(path)
+            if (!dir.isDirectory()) {
+                error("--ggs_input: ggs_path for subject '${subject}' is not a directory: ${path}")
+            }
+            def provided = dir.listFiles()
+                .findAll { entry -> entry.isDirectory() && entry.list().any { name -> name.endsWith('.fasta') } }
+                .collect { entry -> entry.name.toUpperCase() } as Set
+            if (!provided) {
+                error("--ggs_input: ggs_path for subject '${subject}' has no <locus>/*.fasta germline set: ${path}")
+            }
+            def gap = loci[subject].sort().find { locus -> !provided.contains(locus) }
+            if (gap) {
+                error("--ggs_input: subject '${subject}' has samples needing locus ${gap}, which the germline set does not provide: ${path}")
+            }
+        }
+    }
+
+    return ggs
 }

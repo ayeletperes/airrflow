@@ -25,30 +25,21 @@ J_CHAINS = ["IGHJ", "IGKJ", "IGLJ", "TRAJ", "TRBJ", "TRDJ", "TRGJ"]
 
 
 def allele_name(header):
-    """IMGT descriptor -> bare allele name, e.g. J00256|IGHJ1*01|... -> IGHJ1*01.
-
-    Two things need this. IgBLAST matches ndm/aux records to the BLAST database
-    by name, and those databases are built from bare allele names by
-    bin/clean_imgtdb.py. And aux_formats derives the aux chain_type from
-    characters 2-3 of the name, so a full descriptor yields nonsense there.
-    """
+    # IgBLAST matches ndm/aux records to the database by name, and those are built
+    # from bare allele names; aux_formats also derives chain_type from chars 2-3.
     name = header.split()[0]
     return name.split("|")[1] if "|" in name else name
 
 
 def cleaned(ref, dest):
-    """Copy a reference FASTA to `dest` with headers reduced to allele names."""
     simple.write_fasta(str(dest), {allele_name(k): v
                                    for k, v in simple.read_fasta(str(ref)).items()})
     return dest
 
 
 def parse(path):
-    """Split a receptor_utils output into its '#' header and its records.
-
-    aux output is CRLF; both tools write one header line. Concatenating
-    per-chain outputs verbatim would repeat it.
-    """
+    # Both tools write one "#" header; aux output is CRLF. Concatenating verbatim
+    # would repeat the header.
     if not path.exists():
         return "", []
     lines = path.read_text().replace("\r", "").splitlines()

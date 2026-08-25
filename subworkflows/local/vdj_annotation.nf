@@ -5,7 +5,7 @@ include { CHANGEO_PARSEDB_SPLIT } from '../../modules/local/changeo/changeo_pars
 include { FILTER_QUALITY  } from '../../modules/local/reveal/filter_quality'
 include { FILTER_JUNCTION_MOD3  } from '../../modules/local/reveal/filter_junction_mod3'
 include { ADD_META_TO_TAB  } from '../../modules/local/reveal/add_meta_to_tab'
-include { withGermline } from './databases'
+include { germlineKey } from './databases'
 
 
 workflow VDJ_ANNOTATION {
@@ -21,8 +21,12 @@ workflow VDJ_ANNOTATION {
     main:
     ch_logs = channel.empty()
 
+    // combine(by: 0), not join: many samples share one reference key.
     CHANGEO_ASSIGNGENES (
-        withGermline( ch_fasta, ch_reference_by_key, ['igblast'] )
+        ch_fasta
+            .map { meta, fasta -> [ germlineKey(meta), meta, fasta ] }
+            .combine( ch_reference_by_key, by: 0 )
+            .map { _key, meta, fasta, igblast, _reference -> [ meta, fasta, igblast ] }
     )
 
     ch_logs = ch_logs.mix(CHANGEO_ASSIGNGENES.out.logs)
@@ -31,7 +35,10 @@ workflow VDJ_ANNOTATION {
     // which preserves order within a key but not across keys, so a bare .fmt7
     // channel could otherwise be matched to another sample's reads.
     CHANGEO_MAKEDB (
-        withGermline( CHANGEO_ASSIGNGENES.out.fasta, ch_reference_by_key, ['igblast', 'reference_fasta'] )
+        CHANGEO_ASSIGNGENES.out.fasta
+            .map { meta, fasta -> [ germlineKey(meta), meta, fasta ] }
+            .combine( ch_reference_by_key, by: 0 )
+            .map { _key, meta, fasta, igblast, reference -> [ meta, fasta, igblast, reference ] }
             .join( CHANGEO_ASSIGNGENES.out.blast )
     )
     ch_logs = ch_logs.mix(CHANGEO_MAKEDB.out.logs)

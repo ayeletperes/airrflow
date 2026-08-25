@@ -18,21 +18,18 @@ process RESTRICT_REFERENCE {
 
     script:
     def restriction = meta.locus_restriction ? "-l ${meta.locus_restriction}" : ''
-    // A personal germline set replaces the generic V/D/J of every locus it
-    // covers. --require-loci re-checks coverage here because a zipped set
-    // cannot be looked into when the samplesheet is read.
+    // --require-loci re-checks coverage here: a zipped set cannot be inspected
+    // when the samplesheet is read.
     def ggs = ggs_base ? "-g ${ggs_base} --subject '${meta.ggs_subject}' --require-loci ${meta.required_loci}" : ''
     """
     restrict_reference.py -r source_reference -s "${meta.species}" ${restriction} ${ggs} -o reference_base
 
-    # Rebuild the canonical FASTAs and BLAST databases from what survived, so no
-    # gene outside the locus, and no generic allele a germline set replaced, is
-    # left in a database.
+    # Rebuild from what survived, so nothing outside the locus and no replaced
+    # generic allele is left in a database.
     ref2igblast.sh -i reference_base -o igblast_base -d "${database_type}"
 
-    # ref2igblast.sh does not produce the NCBI support trees; carry them over as
-    # hardlinks so each restricted reference does not duplicate 1.4 MB of them.
-    # MAKE_IGBLAST_AUX replaces the germline-derived ndm/aux afterwards.
+    # ref2igblast.sh makes no support trees; hardlink them rather than duplicate
+    # 1.4 MB per reference. MAKE_IGBLAST_AUX replaces the ndm/aux after.
     cp -al source_igblast/internal_data source_igblast/optional_file igblast_base/
 
     """

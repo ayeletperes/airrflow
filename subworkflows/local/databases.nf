@@ -5,7 +5,6 @@ include { VALIDATE_IGBLAST_DB } from '../../modules/local/validate_igblast_db'
 include { MAKE_IGBLAST_AUX } from '../../modules/local/make_igblast_aux'
 include { RESTRICT_REFERENCE } from '../../modules/local/restrict_reference'
 include { UNZIP_DB as UNZIP_GGS } from '../../modules/local/unzip_db'
-include { classLoci } from './utils_nfcore_airrflow_pipeline'
 
 workflow DATABASES {
 
@@ -64,22 +63,15 @@ workflow DATABASES {
         ch_igblast = MAKE_IGBLAST_AUX.out.igblast
     }
 
-    //
-    // Resolve which germline reference each sample needs.
-    //
-    // A sample that asks for no locus restriction and has no personal germline
-    // set resolves to the generic reference above and nothing is built, so a run
-    // using neither feature behaves exactly as it did before. The rest are keyed,
-    // and one reference is built per distinct key -- every IGH-restricted sample
-    // in the run shares a single restricted database.
-    //
+    // One reference per distinct key. A sample needing neither a restriction nor
+    // a personal set keys to the generic reference and nothing is built.
     ch_generic = ch_igblast.combine( ch_reference_fasta )
 
     ch_meta
         .map { meta -> [ germlineKey(meta), meta.species, meta.locus, meta.locus_restriction,
-                            meta.ggs_path, meta.ggs_subject ] }
+                            meta.ggs_path, meta.ggs_subject, meta.required_loci ] }
         .unique { row -> row[0] }
-        .branch { _key, _species, _locus, restriction, ggs, _subject ->
+        .branch { _key, _species, _locus, restriction, ggs, _subject, _required ->
             build: restriction != null || ggs != null
             generic: true
         }
@@ -93,14 +85,12 @@ workflow DATABASES {
         .set { ch_generic_by_key }
 
     ch_build = ch_key_lanes.build
-        .map { key, species, locus, restriction, ggs, subject ->
+        .map { key, species, locus, restriction, ggs, subject, required ->
             def meta = [ id: key.replaceAll(':', '_'), key: key, species: species,
                             locus: locus, locus_restriction: restriction ]
             if (ggs) {
                 meta.ggs_subject = subject
-                // Checked here as well as in the samplesheet: a zipped germline
-                // set cannot be looked into at construction time.
-                meta.required_loci = classLoci( restriction ?: locus ).join(',')
+                meta.required_loci = required
             }
             [ meta, ggs ?: [] ]
         }
@@ -115,14 +105,14 @@ workflow DATABASES {
                 zipped: ggs.toString().endsWith('.zip')
                 ready: true
             }
-            .set { ch_ggs_lanes }
+            .set { ch_ggs }
 
-        UNZIP_GGS( ch_ggs_lanes.zipped.map { _meta, ggs -> file(ggs) }.unique() )
+        UNZIP_GGS( ch_ggs.zipped.map { _meta, ggs -> file(ggs) }.unique() )
 
-        ch_build = ch_ggs_lanes.ready
+        ch_build = ch_ggs.ready
             .map { meta, ggs -> [ meta, ggs ? file(ggs) : [] ] }
             .mix(
-                ch_ggs_lanes.zipped
+                ch_ggs.zipped
                     .map { meta, ggs -> [ file(ggs).simpleName, meta ] }
                     .combine( UNZIP_GGS.out.unzipped.map { dir -> [ dir.name, dir ] }, by: 0 )
                     .map { _name, meta, dir -> [ meta, dir ] }
@@ -147,37 +137,11 @@ workflow DATABASES {
 }
 
 
-//
-// The key identifying which germline reference a sample needs.
-//
-// A locus-restricted reference depends only on (species, locus) -- two subjects
-// both restricted to IGH share one reference, so it is built once. A personal
-// germline set is per subject, so it keys on the subject as well.
-//
+// A restricted reference depends only on (species, locus), so two subjects both
+// restricted to IGH share one build. A personal set is per subject.
 def germlineKey(meta) {
     def locus = meta.locus_restriction ?: meta.locus.toUpperCase()
     return meta.ggs_subject
         ? "ggs:${meta.subject_id}:${locus}"
         : "gen:${meta.species}:${locus}"
 }
-
-//
-// Attach the germline reference(s) a task needs to each item of a [meta, ...]
-// channel. `kinds` selects which to append and in what order, e.g. ['igblast']
-// or ['igblast', 'reference_fasta'].
-//
-// `combine(by: 0)` and not `join`: join is strictly 1:1 on the key, so it would
-// silently drop every sample after the first that shares a reference key. The
-// item is nested under its key first so this works for any tuple arity --
-// [meta, tab], [meta, R1, R2] and [meta] alike.
-//
-def withGermline(ch_items, ch_by_key, kinds) {
-    return ch_items
-        .map { it -> [ germlineKey(it[0]), it ] }
-        .combine( ch_by_key, by: 0 )
-        .map { _key, item, igblast, reference ->
-            def refs = [ igblast: igblast, reference_fasta: reference ]
-            item + kinds.collect { kind -> refs[kind] }
-        }
-}
-

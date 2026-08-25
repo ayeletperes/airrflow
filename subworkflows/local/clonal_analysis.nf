@@ -90,10 +90,9 @@ workflow CLONAL_ANALYSIS {
         }
     }
 
-    // merge all repertoires by the cloneby metadata field and the effective locus:
-    // the locus the germline reference was restricted to, or the receptor class.
-    // Grouping on cloneby alone would put two loci of one subject, each with its
-    // own restricted reference, into a single clone group.
+    // Group by the cloneby field and the effective locus. Grouping on cloneby
+    // alone would put two loci of one subject, each with its own reference, in
+    // one clone group.
     ch_repertoire_reference.map{ it ->
                             def meta = it[0]
                             def grouping_locus = (meta.grouping_locus ?: meta.locus_restriction ?: meta.locus).toUpperCase()
@@ -107,6 +106,20 @@ workflow CLONAL_ANALYSIS {
                                 meta.locus,
                                 it[1],
                                 it[2] ] }
+                .set{ ch_repertoire_flat }
+
+    // Whether a cloneby value spans more than one locus. Only then does the id
+    // need the locus suffix; without this two groups collide on one file name.
+    ch_repertoire_flat
+                .map{ it -> [ it[0], it[1] ] }
+                .groupTuple()
+                .map{ clone_id, loci -> [ clone_id, loci.unique().size() > 1 ] }
+                .set{ ch_mixed_locus }
+
+    ch_repertoire_flat
+                .map{ it -> [ it[0], it ] }
+                .combine( ch_mixed_locus, by: 0 )
+                .map{ _clone_id, row, mixed -> row + [ mixed ] }
                 .groupTuple(by: [0,1])
                 .map{ get_meta_tabs(it, genotypeby, cloneby) }
                 .set{ ch_repertoire_grouped }
@@ -159,6 +172,7 @@ workflow CLONAL_ANALYSIS {
 
 // Function to map
 // arr[0] cloneby value, arr[1] effective (grouping) locus, arr[2] sample meta.id,
+// arr[10] whether this cloneby value spans more than one locus.
 // arr[3] sample_id, arr[4] subject_id, arr[5] species, arr[6] single_cell,
 // arr[7] receptor class, arr[8] repertoire, arr[9] reference fasta.
 def get_meta_tabs(arr, genotypeby, cloneby) {
@@ -174,7 +188,7 @@ def get_meta_tabs(arr, genotypeby, cloneby) {
     def meta = [:]
     // Only suffix the id when the grouping locus actually narrowed the group,
     // otherwise every existing clone-group output would be renamed for nothing.
-    meta.id                 = grouping_locus == locus_class.toUpperCase() ? clone_id.toString() : "${clone_id}_${grouping_locus}".toString()
+    meta.id                 = arr[10].unique().contains(true) ? "${clone_id}_${grouping_locus}".toString() : clone_id.toString()
     meta.sample_id          = arr[3].flatten()
     meta.subject_id         = arr[4].unique().join("")
     meta.species            = arr[5].unique().join("")
