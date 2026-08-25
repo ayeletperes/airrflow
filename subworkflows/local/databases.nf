@@ -79,7 +79,7 @@ workflow DATABASES {
 
     ch_key_lanes.generic
         .combine( ch_generic )
-        .map { key, _species, _locus, _restriction, _ggs, _subject, igblast, reference ->
+        .map { key, _species, _locus, _restriction, _ggs, _subject, _required, igblast, reference ->
             [ key, igblast, reference ]
         }
         .set { ch_generic_by_key }
