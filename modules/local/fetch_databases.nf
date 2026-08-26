@@ -4,7 +4,7 @@ process FETCH_DATABASES {
     label 'immcantation'
 
     conda "bioconda::changeo=1.3.4 bioconda::igblast=1.22.0 conda-forge::wget=1.25.0"
-    container "docker.io/peresay/airrflow-sourcerer:sourcerer-bf1223f-3"
+    container "docker.io/peresay/airrflow-sourcerer:sourcerer-bf1223f-4"
 
     input:
     val(database_type)
