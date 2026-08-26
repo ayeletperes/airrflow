@@ -64,6 +64,11 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
             ch_grouped_repertoires_by_locus.ig
         )
 
+        // Both sides of this join key on meta. Dump them to see the keys when the
+        // join comes up empty: nextflow run ... -dump-channels novel_in,novel_out
+        ch_grouped_repertoires_by_locus.ig.dump(tag: 'novel_in')
+        NOVEL_ALLELE_INFERENCE.out.reference.dump(tag: 'novel_out')
+
         // reassign novel alleles (we can skip this step if no novel alleles were inferred)
         ch_grouped_repertoires_by_locus.ig
             .join(NOVEL_ALLELE_INFERENCE.out.reference)
