@@ -9,11 +9,10 @@ process CHANGEO_ASSIGNGENES {
         'community.wave.seqera.io/library/changeo_igblast_wget:192e77f3b68daa50' }"
 
     input:
-    tuple val(meta), path(reads) // reads in fasta format
-    path(igblast) // igblast references
+    tuple val(meta), path(reads), path(igblast) // reads in fasta format + igblast references
 
     output:
-    path("*igblast.fmt7"), emit: blast
+    tuple val(meta), path("*igblast.fmt7"), emit: blast
     tuple val(meta), path("$reads"), emit: fasta
     tuple val("${task.process}"), val('igblastn'), eval('igblastn -version | grep -o "igblast[0-9\\. ]\\+" | grep -o "[0-9\\. ]\\+"'), emit: versions_igblastn, topic: versions
     tuple val("${task.process}"), val('changeo'), eval('AssignGenes.py --version | grep -o "[0-9][0-9.]*" | head -n 1'), emit: versions_changeo, topic: versions

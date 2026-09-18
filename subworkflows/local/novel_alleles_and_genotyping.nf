@@ -6,8 +6,7 @@ include { CLONAL_ASSIGNMENT as CLONAL_ASSIGNMENT_GENOTYPING } from '../../module
 
 workflow NOVEL_ALLELES_AND_GENOTYPING {
     take:
-    ch_repertoire
-    ch_reference_fasta
+    ch_repertoire // channel: [ val(meta), path(tab), path(reference_fasta) ]
     ch_validated_samplesheet
     ch_logo
     genotypeby
@@ -22,7 +21,6 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
 
     // merge all repertoires by genotypeby metadata field
     ch_repertoire
-        .combine(ch_reference_fasta)
         .map{ it ->
                 def meta = it[0]
                 def rep = it[1]
