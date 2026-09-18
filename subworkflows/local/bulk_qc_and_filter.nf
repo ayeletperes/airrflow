@@ -2,12 +2,13 @@ include { CHANGEO_CREATEGERMLINES } from '../../modules/local/changeo/changeo_cr
 include { REMOVE_CHIMERIC  } from '../../modules/local/enchantr/remove_chimeric'
 include { DETECT_CONTAMINATION  } from '../../modules/local/enchantr/detect_contamination'
 include { COLLAPSE_DUPLICATES  } from '../../modules/local/enchantr/collapse_duplicates'
+include { germlineKey } from './databases'
 
 workflow BULK_QC_AND_FILTER {
 
     take:
     ch_repertoire // tuple [meta, repertoire_tab]
-    ch_reference_fasta
+    ch_reference_by_key // channel: [ val(key), path(igblast_base), path(reference_base) ]
     remove_chimeric
     detect_contamination
     collapseby
@@ -21,15 +22,16 @@ workflow BULK_QC_AND_FILTER {
 
         // Create germlines (not --cloned)
         CHANGEO_CREATEGERMLINES(
-            ch_repertoire,
-            ch_reference_fasta.collect()
+            ch_repertoire
+                .map { meta, tab -> [ germlineKey(meta), meta, tab ] }
+                .combine( ch_reference_by_key, by: 0 )
+                .map { _key, meta, tab, _igblast, reference -> [ meta, tab, reference ] }
         )
         ch_logs = ch_logs.mix(CHANGEO_CREATEGERMLINES.out.logs)
 
         // Remove chimera
         REMOVE_CHIMERIC(
-            CHANGEO_CREATEGERMLINES.out.tab,
-            ch_reference_fasta.collect()
+            CHANGEO_CREATEGERMLINES.out.tab
         )
         ch_logs = ch_logs.mix(REMOVE_CHIMERIC.out.logs)
         ch_bulk_chimeric_pass = REMOVE_CHIMERIC.out.tab

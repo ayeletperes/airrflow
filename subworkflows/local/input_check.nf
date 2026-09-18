@@ -6,6 +6,7 @@
  * locus, subject_id) is available to every downstream subworkflow.
  */
 
+include { samplesheetToList                                } from 'plugin/nf-schema'
 include { SAMPLESHEET_CHECK                                } from '../../modules/local/samplesheet_check'
 include { SAMPLESHEET_CHECK as SAMPLESHEET_CHECK_ASSEMBLED } from '../../modules/local/samplesheet_check'
 include { VALIDATE_INPUT                                   } from '../../modules/local/enchantr/validate_input'
@@ -25,6 +26,7 @@ workflow INPUT_CHECK {
     index_file
 
     main:
+    def ggs = ggsSubjectMap( params.ggs_input, params.input )
 
     ch_versions = channel.empty()
     ch_logs     = channel.empty()
@@ -38,7 +40,7 @@ workflow INPUT_CHECK {
         SAMPLESHEET_CHECK ( samplesheet )
             .tsv
             .splitCsv ( header:true, sep:'\t' )
-            .map { create_fastq_channels(it, collapseby, cloneby, index_file) }
+            .map { create_fastq_channels(it, collapseby, cloneby, index_file, ggs) }
             .groupTuple(by: [0])
             .branch {
                 meta, fastqs ->
@@ -83,7 +85,7 @@ workflow INPUT_CHECK {
 
         ch_validated_samplesheet
             .splitCsv(header: true, sep:'\t')
-            .map { get_meta(it) }
+            .map { get_meta(it, ggs) }
                 .branch { it ->
                     fasta: it[0].filename =~ /[fasta|fa]$/
                     tsv:   it[0].filename =~ /tsv$/
@@ -103,6 +105,7 @@ workflow INPUT_CHECK {
     }
 
     emit:
+    meta = ch_reads.mix( ch_fasta, ch_tsv ).map { it -> it[0] } // channel: [ val(meta) ]
     reads = ch_reads // channel: [ val(meta), [ reads ] ], fastq mode only
     fasta = ch_fasta // channel: [ val(meta), fasta ], assembled mode only
     tsv = ch_tsv // channel: [ val(meta), tsv ], assembled mode only
@@ -112,7 +115,7 @@ workflow INPUT_CHECK {
 }
 
 // Function to map the raw (fastq) samplesheet
-def create_fastq_channels(LinkedHashMap col, collapseby, cloneby, index_file) {
+def create_fastq_channels(LinkedHashMap col, collapseby, cloneby, index_file, ggs) {
 
     def meta = [:]
 
@@ -126,6 +129,7 @@ def create_fastq_channels(LinkedHashMap col, collapseby, cloneby, index_file) {
     meta.single_cell        = col.single_cell.toLowerCase()
     meta.locus              = col.pcr_target_locus
     meta.single_end         = false
+    meta += ggsMeta(col, ggs)
 
     def array = []
     if (!file(col.filename_R1).exists()) {
@@ -152,7 +156,7 @@ def create_fastq_channels(LinkedHashMap col, collapseby, cloneby, index_file) {
 }
 
 // Function to map the validated (assembled) samplesheet
-def get_meta (LinkedHashMap col) {
+def get_meta (LinkedHashMap col, ggs) {
 
     def meta = [:]
 
@@ -169,10 +173,54 @@ def get_meta (LinkedHashMap col) {
     meta.single_cell = col.single_cell
     meta.pcr_target_locus = col.pcr_target_locus
     meta.locus = col.locus
+    meta += ggsMeta(col, ggs)
 
     if (!file(col.filename).exists()) {
         error "ERROR: Please check input samplesheet: filename does not exist!\n${col.filename}"
     }
 
     return  [ meta, file(col.filename) ]
+}
+
+def ggsMeta(col, ggs) {
+    def entry = ggs[ col.subject_id?.toString() ]
+    return entry ? [ ggs_path: entry.path, ggs_loci: entry.loci ] : [:]
+}
+
+// Reads --ggs_input before any task runs. Locus coverage is checked when the set is built.
+def ggsSubjectMap(ggs_input, input) {
+    if (!ggs_input) {
+        return [:]
+    }
+    def ggs = [:]
+    samplesheetToList(ggs_input, "${projectDir}/assets/schema_ggs_input.json").each { row ->
+        def subject = row[0].toString()
+        if (ggs.containsKey(subject)) {
+            error("--ggs_input: subject '${subject}' appears more than once.")
+        }
+        ggs[subject] = [ path: row[1].toString(), loci: [] as Set, species: [] as Set ]
+    }
+    file(input).splitCsv(header: true, sep: '\t').each { row ->
+        def entry = ggs[ row.subject_id?.toString() ]
+        if (entry) {
+            def target = row.pcr_target_locus.toUpperCase()
+            entry.loci += target == 'IG' ? ['IGH', 'IGK', 'IGL'] : target == 'TR' ? ['TRA', 'TRB', 'TRG', 'TRD'] : [target]
+            entry.species += row.species
+        }
+    }
+    ggs.each { subject, entry ->
+        if (!entry.species) {
+            error("--ggs_input: subject '${subject}' is not in --input.")
+        }
+        if (entry.species.size() > 1) {
+            error("--ggs_input: subject '${subject}' has samples from more than one species.")
+        }
+        entry.loci = entry.loci.sort()
+    }
+    // Zipped sets are matched back to their build by file name.
+    def names = ggs.values()*.path.findAll { path -> path.endsWith('.zip') }.collect { path -> file(path).simpleName }
+    if (names.size() != names.unique(false).size()) {
+        error("--ggs_input: zipped germline sets must have distinct file names.")
+    }
+    return ggs
 }

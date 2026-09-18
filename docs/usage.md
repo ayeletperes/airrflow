@@ -223,6 +223,24 @@ An example samplesheet is:
 | sc5p_v2_hs_PBMC_1k_b_airr_rearrangement.tsv | human   | subject_x  | sc5p_v2_hs_PBMC_1k_5fb | PBMC   | NA   | NA  | 10x Genomics         | IG               | TRUE        |
 | bulk-Laserson-2014.fasta                    | human   | PGP1       | PGP1                   | PBMC   | male | NA  | Laserson-2014        | IG               | FALSE       |
 
+### Per-subject germline sets
+
+:::warning
+Under development. `--ggs_input` is a hidden parameter and its samplesheet columns are not yet a stable interface.
+:::
+
+A personal germline set can be supplied per subject with `--ggs_input`, a second samplesheet in TSV format with the columns `subject_id` and `ggs_path`:
+
+| subject_id | ggs_path                      |
+| ---------- | ----------------------------- |
+| CE0007908  | /data/germline_sets/CE0007908 |
+| CE0006623  | /data/germline_sets/CE0006623 |
+
+- `subject_id`: matches the `subject_id` column of the main samplesheet.
+- `ggs_path`: a directory, or a `.zip` of one, with one sub-directory per locus (`IGH/`, `IGK/`, ...). Each holds `V_gapped_asc.fasta` (IMGT-gapped) and `J_asc.fasta`, plus `D_asc.fasta` for loci with D genes.
+
+For the subjects listed, the V, D and J genes of every locus in their set replace the generic ones; constant regions stay generic. One reference is built per subject, and subjects not listed keep the generic reference, so both can be mixed in one run. The set must provide every locus the subject's samples target (`IG` needs `IGH`, `IGK` and `IGL`), or the build fails.
+
 ### Supported AIRR metadata fields
 
 nf-core/airrflow offers full support for the [AIRR standards 1.4](https://docs.airr-community.org/en/stable/datarep/metadata.html) metadata annotation. The minimum metadata fields that are needed by the pipeline are listed in the table below. Other non-mandatory AIRR fields can be provided in the input samplesheet, which will be available for reporting and introducing comparisons among repertoires.
@@ -596,16 +614,17 @@ nextflow run nf-core/airrflow \
 ## Germline reference options
 
 The germline reference is what every V(D)J assignment is made against, so it is worth
-being explicit about which one a run used. There are three ways to supply it.
+being explicit about which one a run used. There are three supported ways to supply it, and per-subject germline sets are under development.
 
-| Option                            | Parameters                                 | Scope       | Status    |
-| --------------------------------- | ------------------------------------------ | ----------- | --------- |
-| Cached reference bundle (default) | `--reference_fasta`, `--reference_igblast` | all samples | supported |
-| Fetch at runtime                  | `--fetch_germlines imgt` or `airrc-imgt`   | all samples | supported |
-| Your own custom reference         | `--reference_fasta`, `--reference_igblast` | all samples | supported |
+| Option                            | Parameters                                 | Scope       | Status            |
+| --------------------------------- | ------------------------------------------ | ----------- | ----------------- |
+| Cached reference bundle (default) | `--reference_fasta`, `--reference_igblast` | all samples | supported         |
+| Fetch at runtime                  | `--fetch_germlines imgt` or `airrc-imgt`   | all samples | supported         |
+| Your own custom reference         | `--reference_fasta`, `--reference_igblast` | all samples | supported         |
+| Per-subject germline sets         | `--ggs_input`                              | per subject | under development |
 
-Nothing changes for an existing run. `--generate_igblast_aux` defaults to `false`; unset,
-no extra process runs and the reference is resolved exactly as it was before.
+Nothing changes for an existing run. `--generate_igblast_aux` defaults to `false` and `--ggs_input` to null;
+with neither set, no extra process runs and the reference is resolved exactly as it was before.
 
 ### The cached reference bundle (default)
 
