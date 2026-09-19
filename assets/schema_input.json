@@ -20,8 +20,8 @@
             },
             "species": {
                 "type": "string",
-                "enum": ["mouse", "human"],
-                "errorMessage": "Species name must be provided and must be one of: mouse, human."
+                "enum": ["mouse", "human", "rhesus_monkey"],
+                "errorMessage": "Species name must be provided and must be one of: mouse, human, rhesus_monkey."
             },
             "pcr_target_locus": {
                 "type": "string",

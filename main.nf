@@ -114,6 +114,7 @@ params {
     fetch_germlines: String = 'none'
     generate_igblast_aux: Boolean = false
     skip_alignment_filter: Boolean = false
+    skip_vdj_annotation: Boolean = false
 
     // -----------------------
     // bulk filtering options
@@ -285,6 +286,7 @@ workflow NFCORE_AIRRFLOW {
         params.trust4_umi_read,
         params.trust4_read_format,
         params.skip_alignment_filter,
+        params.skip_vdj_annotation,
         params.productive_only,
         params.remove_chimeric,
         params.detect_contamination,
