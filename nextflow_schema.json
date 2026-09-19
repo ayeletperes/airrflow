@@ -470,6 +470,13 @@
                     "help_text": "IgBLAST ships a `.ndm` file (V-gene FWR/CDR boundaries) and a `.aux` file (J-gene reading frame and the position of the conserved PHE/TRP) per species. Both encode coordinates that are specific to the germline set they were derived from, so pairing the shipped files with a custom germline reference mis-annotates. When enabled, these two files are rebuilt with `receptor_utils` from the IMGT-gapped per-chain V and J FASTAs of the germline reference in use, and replace the shipped ones inside the IgBLAST database directory. This step runs in its own container that provides `receptor_utils`, so it is not supported with `-profile conda`.",
                     "fa_icon": "fas fa-ruler-combined",
                     "default": false
+                },
+                "skip_vdj_annotation": {
+                    "type": "boolean",
+                    "default": false,
+                    "description": "Skip V(D)J annotation and all downstream analysis steps, running sequence assembly only.",
+                    "help_text": "When set, the pipeline stops after pre-processing and publishes the assembled FASTA that is otherwise an intermediate: `presto/10-splitseq` for the UMI protocols, `presto/05-splitseq` for the non-UMI protocols and `presto/03-fasta` for `dt_5p_race_umi_header`. The `sc_10x_genomics` and `trust4` protocols publish their FASTA under `vdj_annotation/convert-db` either way.",
+                    "fa_icon": "fas fa-forward"
                 }
             },
             "fa_icon": "fas fa-edit"

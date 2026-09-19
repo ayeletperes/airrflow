@@ -89,6 +89,7 @@ workflow AIRRFLOW {
         trust4_umi_read
         trust4_read_format
         skip_alignment_filter
+        skip_vdj_annotation
         productive_only
         remove_chimeric
         detect_contamination
@@ -324,136 +325,140 @@ workflow AIRRFLOW {
             error "Mode parameter value not valid."
         }
 
-        // Perform V(D)J annotation and filtering
-        VDJ_ANNOTATION(
-            ch_fasta,
-            ch_tsv_files,
-            ch_validated_samplesheet.collect(),
-            DATABASES.out.reference_by_key,
-            skip_alignment_filter,
-            productive_only
-        )
+        if (!skip_vdj_annotation) {
+            // Perform V(D)J annotation and filtering
+            VDJ_ANNOTATION(
+                ch_fasta,
+                ch_tsv_files,
+                ch_validated_samplesheet.collect(),
+                DATABASES.out.reference_by_key,
+                skip_alignment_filter,
+                productive_only
+            )
 
-        // Split bulk and single cell repertoires
-        ch_repertoire_by_processing = VDJ_ANNOTATION.out.repertoire
-            .branch { it ->
-                single: it[0].single_cell == 'true'
-                bulk:   it[0].single_cell == 'false'
+            // Split bulk and single cell repertoires
+            ch_repertoire_by_processing = VDJ_ANNOTATION.out.repertoire
+                .branch { it ->
+                    single: it[0].single_cell == 'true'
+                    bulk:   it[0].single_cell == 'false'
+                }
+
+            // Bulk: Assign germlines and filtering
+            ch_repertoire_by_processing.bulk
+
+            BULK_QC_AND_FILTER(
+                ch_repertoire_by_processing.bulk,
+                DATABASES.out.reference_by_key,
+                remove_chimeric,
+                detect_contamination,
+                collapseby
+            )
+
+            ch_bulk_filtered = BULK_QC_AND_FILTER.out.repertoires
+
+            // Single cell: QC and filtering
+            ch_repertoire_by_processing.single
+
+            SINGLE_CELL_QC_AND_FILTERING(
+                ch_repertoire_by_processing.single
+            )
+
+            // Mixing bulk and single cell channels after filtering
+            ch_repertoires_after_qc = ch_bulk_filtered
+                                            .mix(SINGLE_CELL_QC_AND_FILTERING.out.repertoires)
+
+            // Novel alleles and genotype inference
+            if (genotyping) {
+                NOVEL_ALLELES_AND_GENOTYPING(
+                    ch_repertoires_after_qc
+                        .map { meta, tab -> [ germlineKey(meta), meta, tab ] }
+                        .combine( DATABASES.out.reference_by_key, by: 0 )
+                        .map { _key, meta, tab, _igblast, reference -> [ meta, tab, reference ] },
+                    ch_validated_samplesheet.collect(),
+                    ch_report_logo_img.collect().ifEmpty([]),
+                    genotypeby,
+                    novel_allele_inference,
+                    single_clone_representative,
+                    genotyping_clonal_threshold,
+                    cloneby,
+                    singlecell
+                )
+                ch_repertoire_reference = NOVEL_ALLELES_AND_GENOTYPING.out.repertoire_reference
+
+            } else {
+                ch_repertoire_reference = ch_repertoires_after_qc
+                        .map { meta, tab -> [ germlineKey(meta), meta, tab ] }
+                        .combine( DATABASES.out.reference_by_key, by: 0 )
+                        .map { _key, meta, tab, _igblast, reference -> [ meta, tab, reference ] }
+            }
+            ch_repertoire_reference.dump(tag: 'ch_repertoire_reference_forcloning')
+
+            // Clonal analysis
+            if (!skip_clonal_analysis) {
+                CLONAL_ANALYSIS(
+                    ch_repertoire_reference,
+                    ch_report_logo_img.collect().ifEmpty([]),
+                    clonal_threshold,
+                    skip_report_threshold,
+                    cloneby,
+                    skip_all_clones_report,
+                    lineage_trees,
+                    genotypeby,
+                    crossby,
+                    singlecell,
+                    lineage_tree_builder,
+                    lineage_tree_exec
+                )
             }
 
-        // Bulk: Assign germlines and filtering
-        ch_repertoire_by_processing.bulk
+            // Translation and embedding
+            if (translate || embeddings) {
+                TRANSLATE_EMBED(
+                    ch_repertoires_after_qc,
+                    DATABASES.out.reference_by_key,
+                    embeddings,
+                    embedding_chain
+                )
+            }
 
-        BULK_QC_AND_FILTER(
-            ch_repertoire_by_processing.bulk,
-            DATABASES.out.reference_by_key,
-            remove_chimeric,
-            detect_contamination,
-            collapseby
-        )
+            if (!skip_report){
+                ch_all_repertoires_after_qc = ch_repertoires_after_qc
+                    .map { it -> it[1] }
+                    .collect()
+                    .map { it -> [ [id:'all_reps'], it ] }
 
-        ch_bulk_filtered = BULK_QC_AND_FILTER.out.repertoires
-
-        // Single cell: QC and filtering
-        ch_repertoire_by_processing.single
-
-        SINGLE_CELL_QC_AND_FILTERING(
-            ch_repertoire_by_processing.single
-        )
-
-        // Mixing bulk and single cell channels after filtering
-        ch_repertoires_after_qc = ch_bulk_filtered
-                                        .mix(SINGLE_CELL_QC_AND_FILTERING.out.repertoires)
-
-        // Novel alleles and genotype inference
-        if (genotyping) {
-            NOVEL_ALLELES_AND_GENOTYPING(
-                ch_repertoires_after_qc
-                    .map { meta, tab -> [ germlineKey(meta), meta, tab ] }
-                    .combine( DATABASES.out.reference_by_key, by: 0 )
-                    .map { _key, meta, tab, _igblast, reference -> [ meta, tab, reference ] },
-                ch_validated_samplesheet.collect(),
-                ch_report_logo_img.collect().ifEmpty([]),
-                genotypeby,
-                novel_allele_inference,
-                single_clone_representative,
-                genotyping_clonal_threshold,
-                cloneby,
-                singlecell
-            )
-            ch_repertoire_reference = NOVEL_ALLELES_AND_GENOTYPING.out.repertoire_reference
+                REPERTOIRE_ANALYSIS_REPORTING(
+                    ch_presto_filterseq_logs.collect().ifEmpty([]),
+                    ch_presto_maskprimers_logs.collect().ifEmpty([]),
+                    ch_presto_pairseq_logs.collect().ifEmpty([]),
+                    ch_presto_clustersets_logs.collect().ifEmpty([]),
+                    ch_presto_buildconsensus_logs.collect().ifEmpty([]),
+                    ch_presto_postconsensus_pairseq_logs.collect().ifEmpty([]),
+                    ch_presto_assemblepairs_logs.collect().ifEmpty([]),
+                    ch_presto_collapseseq_logs.collect().ifEmpty([]),
+                    ch_presto_splitseq_logs.collect().ifEmpty([]),
+                    ch_input_check_logs.collect().ifEmpty([]),
+                    ch_reassign_logs.collect().ifEmpty([]),
+                    VDJ_ANNOTATION.out.changeo_makedb_logs.collect().ifEmpty([]),
+                    VDJ_ANNOTATION.out.logs.collect().ifEmpty([]),
+                    BULK_QC_AND_FILTER.out.logs.collect().ifEmpty([]),
+                    SINGLE_CELL_QC_AND_FILTERING.out.logs.collect().ifEmpty([]),
+                    ch_all_repertoires_after_qc,
+                    ch_input.collect(),
+                    ch_report_rmd.collect(),
+                    ch_report_css.collect(),
+                    ch_report_logo.collect(),
+                    ch_validated_samplesheet.collect(),
+                    mode,
+                    library_generation_method,
+                    umi_length,
+                    cluster_sets
+                )
+            }
 
         } else {
-            ch_repertoire_reference = ch_repertoires_after_qc
-                    .map { meta, tab -> [ germlineKey(meta), meta, tab ] }
-                    .combine( DATABASES.out.reference_by_key, by: 0 )
-                    .map { _key, meta, tab, _igblast, reference -> [ meta, tab, reference ] }
+            log.info "Skipping V(D)J annotation and downstream steps because --skip_vdj_annotation was set."
         }
-        ch_repertoire_reference.dump(tag: 'ch_repertoire_reference_forcloning')
-
-        // Clonal analysis
-        if (!skip_clonal_analysis) {
-            CLONAL_ANALYSIS(
-                ch_repertoire_reference,
-                ch_report_logo_img.collect().ifEmpty([]),
-                clonal_threshold,
-                skip_report_threshold,
-                cloneby,
-                skip_all_clones_report,
-                lineage_trees,
-                genotypeby,
-                crossby,
-                singlecell,
-                lineage_tree_builder,
-                lineage_tree_exec
-            )
-        }
-
-        // Translation and embedding
-        if (translate || embeddings) {
-            TRANSLATE_EMBED(
-                ch_repertoires_after_qc,
-                DATABASES.out.reference_by_key,
-                embeddings,
-                embedding_chain
-            )
-        }
-
-        if (!skip_report){
-            ch_all_repertoires_after_qc = ch_repertoires_after_qc
-                .map { it -> it[1] }
-                .collect()
-                .map { it -> [ [id:'all_reps'], it ] }
-
-            REPERTOIRE_ANALYSIS_REPORTING(
-                ch_presto_filterseq_logs.collect().ifEmpty([]),
-                ch_presto_maskprimers_logs.collect().ifEmpty([]),
-                ch_presto_pairseq_logs.collect().ifEmpty([]),
-                ch_presto_clustersets_logs.collect().ifEmpty([]),
-                ch_presto_buildconsensus_logs.collect().ifEmpty([]),
-                ch_presto_postconsensus_pairseq_logs.collect().ifEmpty([]),
-                ch_presto_assemblepairs_logs.collect().ifEmpty([]),
-                ch_presto_collapseseq_logs.collect().ifEmpty([]),
-                ch_presto_splitseq_logs.collect().ifEmpty([]),
-                ch_input_check_logs.collect().ifEmpty([]),
-                ch_reassign_logs.collect().ifEmpty([]),
-                VDJ_ANNOTATION.out.changeo_makedb_logs.collect().ifEmpty([]),
-                VDJ_ANNOTATION.out.logs.collect().ifEmpty([]),
-                BULK_QC_AND_FILTER.out.logs.collect().ifEmpty([]),
-                SINGLE_CELL_QC_AND_FILTERING.out.logs.collect().ifEmpty([]),
-                ch_all_repertoires_after_qc,
-                ch_input.collect(),
-                ch_report_rmd.collect(),
-                ch_report_css.collect(),
-                ch_report_logo.collect(),
-                ch_validated_samplesheet.collect(),
-                mode,
-                library_generation_method,
-                umi_length,
-                cluster_sets
-            )
-        }
-
 
     //
     // Collate and save software versions

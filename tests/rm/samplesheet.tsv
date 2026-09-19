@@ -1,4 +1,4 @@
 sample_id	subject_id	species	pcr_target_locus	tissue	sex	age	biomaterial_provider	single_cell	filename_R1	filename_R2
-S1	RM01	human	IG	blood	NA	NA	RM	FALSE	tests/rm/S1_R1.fastq.gz	tests/rm/S1_R2.fastq.gz
-S2	RM01	human	IG	blood	NA	NA	RM	FALSE	tests/rm/S2_R1.fastq.gz	tests/rm/S2_R2.fastq.gz
-S3	RM02	human	IG	blood	NA	NA	RM	FALSE	tests/rm/S3_R1.fastq	tests/rm/S3_R2.fastq
+S1	RM01	rhesus_monkey	IG	blood	NA	NA	RM	FALSE	tests/rm/S1_R1.fastq.gz	tests/rm/S1_R2.fastq.gz
+S2	RM01	rhesus_monkey	IG	blood	NA	NA	RM	FALSE	tests/rm/S2_R1.fastq.gz	tests/rm/S2_R2.fastq.gz
+S3	RM02	rhesus_monkey	IG	blood	NA	NA	RM	FALSE	tests/rm/S3_R1.fastq	tests/rm/S3_R2.fastq

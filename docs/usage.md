@@ -163,7 +163,17 @@ The required input file for processing raw BCR or TCR bulk targeted sequencing d
 - `filename_R2`: path to fastq file with second mates of paired-end sequencing.
 - `filename_I1` (optional): path to fastq with illumina index and UMI (unique molecular identifier) barcode.
 - `subject_id`: Subject ID assigned by submitter, unique within study.
-- `species`: species from which the sample was taken. Supported species are `human` and `mouse`.
+- `species`: species from which the sample was taken. Accepted values are `human`, `mouse` and
+  `rhesus_monkey` (the token NCBI and IgBLAST use for rhesus macaque). The value is used verbatim
+  to locate the germline reference: a `<species>/vdj/` directory in `--reference_fasta` and
+  `<species>_<ig|tr>_<v|d|j|c>` BLAST databases in `--reference_igblast`.
+
+  V(D)J annotation is currently only supported for `human` and `mouse`: neither the cached
+  reference bundle nor `--fetch_germlines imgt` / `airrc-imgt` produces a `rhesus_monkey`
+  reference tree. `rhesus_monkey` is accepted so that the samplesheet can record the real species
+  of the sample, but such a run must either supply a matching reference of its own via
+  `--reference_fasta` / `--reference_igblast`, or stop before annotation with
+  `--skip_vdj_annotation`.
 - `tissue`: tissue from which the sample was taken. E.g. `blood`, `PBMC`, `brain`.
 - `pcr_target_locus`: Designation of the target locus (`IG` or `TR`).
 - `biomaterial_provider`: Institution / research group that provided the samples.
@@ -562,6 +572,20 @@ nextflow run nf-core/airrflow -r <release> \
 --library_generation_method dt_5p_race_umi_header \
 --outdir ./results
 ```
+
+### Stopping after sequence assembly
+
+`--skip_vdj_annotation` stops the run after pre-processing, skipping V(D)J annotation and everything
+downstream (germline assignment, filtering, genotyping, clonal analysis and the report). It is useful
+when no suitable IgBLAST germline reference is available for the species at hand, or when only the
+assembled sequences are wanted. The FASTA that is otherwise an intermediate is then published:
+
+| Library generation method                                     | Published FASTA                |
+| ------------------------------------------------------------- | ------------------------------ |
+| `specific_pcr_umi`, `dt_5p_race_umi`                           | `presto/10-splitseq/<sample>/` |
+| `specific_pcr`, `dt_5p_race`                                   | `presto/05-splitseq/<sample>/` |
+| `dt_5p_race_umi_header`                                        | `presto/03-fasta/<sample>/`    |
+| `sc_10x_genomics`, `trust4`                                    | `vdj_annotation/convert-db/<sample>/` (published either way) |
 
 ## UMI barcode handling
 

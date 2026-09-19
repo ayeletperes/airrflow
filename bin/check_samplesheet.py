@@ -47,7 +47,7 @@ def check_samplesheet(file_in, assembled):
     - sample ids are unique
     - samples from the same subject come from the same species
     - pcr_target_locus is "IG"/"ig" or "TR"/"tr"
-    - species is "human" or "mouse"
+    - species is one of "human", "mouse", "rhesus_monkey"
     """
 
     sample_run_dict = {}
@@ -172,11 +172,15 @@ def check_samplesheet(file_in, assembled):
             if val.upper() not in ["IG", "TR"]:
                 print_error("pcr_target_locus must be one of: IG, TR.")
 
-        ## Check that species is human or mouse
+        ## Check that species is one of the supported species
+        # ponytail: rhesus_monkey is accepted so the samplesheet can state the real species,
+        # but only human and mouse have a germline reference. A rhesus_monkey run needs its own
+        # --reference_fasta/--reference_igblast or --skip_vdj_annotation. Widening the reference
+        # tooling (sourcerer SPECIES, ref2igblast.sh, validate_igblast_db.sh) is a separate change.
         for val in tab["species"]:
-            if val not in ["human", "mouse"]:
+            if val not in ["human", "mouse", "rhesus_monkey"]:
                 print_error(
-                    "species must be one of: human, mouse. Currently, only human or mouse reference files are supported."
+                    "species must be one of: human, mouse, rhesus_monkey."
                 )
 
         ## Check that samples from the same subject are the same species
