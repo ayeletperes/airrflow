@@ -14,6 +14,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ### `Added`
 
 - Added the `--generate_igblast_aux` parameter (default `false`), which regenerates the IgBLAST `.ndm` and `.aux` auxiliary files from the germline reference in use with `receptor_utils`, replacing the ones shipped with IgBLAST. Needs a container profile; not available under `-profile conda`.
+- The samplesheet column `pcr_target_locus` now accepts a single locus (`IGH`, `IGK`, `IGL`, `TRA`, `TRB`, `TRG`, `TRD`) in addition to the classes `IG` and `TR`. A single locus restricts the germline reference to that locus, with one reference built per distinct `(species, locus)`. Class D genes are always retained. Added the `test_locus_restriction` profile.
 - Added the `--ggs_input` parameter (hidden, under development): a samplesheet of per-subject personal germline sets that replace the generic V, D and J genes for those subjects. Added the `test_ggs` and `test_ggs_zip` profiles.
 - [#407](https://github.com/nf-core/airrflow/pull/407) Added genotyping sub-workflow.
 - [#424](https://github.com/nf-core/airrflow/issues/424) Added support for AIRR-C germline reference.

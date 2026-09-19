@@ -25,8 +25,8 @@
             },
             "pcr_target_locus": {
                 "type": "string",
-                "enum": ["TR", "IG", "ig", "tr", "Ig", "Tr"],
-                "errorMessage": "PCR target locus must be provided and must be one of: TR, IG."
+                "enum": ["TR", "IG", "ig", "tr", "Ig", "Tr", "IGH", "igh", "Igh", "IGK", "igk", "Igk", "IGL", "igl", "Igl", "TRA", "tra", "Tra", "TRB", "trb", "Trb", "TRG", "trg", "Trg", "TRD", "trd", "Trd"],
+                "errorMessage": "PCR target locus must be provided and must be one of: IG, TR (the whole receptor class), or a single locus: IGH, IGK, IGL, TRA, TRB, TRG, TRD."
             },
             "tissue": {
                 "type": "string",
