@@ -84,10 +84,11 @@
                         "specific_pcr",
                         "dt_5p_race",
                         "dt_5p_race_umi",
+                        "dt_5p_race_umi_header",
                         "sc_10x_genomics",
                         "trust4"
                     ],
-                    "help_text": "Available protocols are:\n- `specific_pcr_umi`: RT-PCR using transcript-specific primers containing UMIs.\n- `specific_pcr`: RT-PCR using transcript-specific primers.\n- `dt_5p_race_umi`: 5\u2019-RACE PCR using oligo-dT primers and template switch primers containing UMI.\n- `dt_5p_race`: 5\u2019-RACE PCR (i.e. RT is followed by a template switch (TS) step) using oligo-dT primers.\n- `sc_10x_genomics`:10x genomics library preparation protocol for scVDJ sequencing."
+                    "help_text": "Available protocols are:\n- `specific_pcr_umi`: RT-PCR using transcript-specific primers containing UMIs.\n- `specific_pcr`: RT-PCR using transcript-specific primers.\n- `dt_5p_race_umi`: 5\u2019-RACE PCR using oligo-dT primers and template switch primers containing UMI.\n- `dt_5p_race`: 5\u2019-RACE PCR (i.e. RT is followed by a template switch (TS) step) using oligo-dT primers.\n- `dt_5p_race_umi_header`: same chemistry as `dt_5p_race_umi`, but the reads arrive already demultiplexed and trimmed, with the UMI and the trimmed prefix recorded as `UMI=` and `TRIM=` annotations in the R1 header. No primer masking and no duplicate collapsing are performed.\n- `sc_10x_genomics`:10x genomics library preparation protocol for scVDJ sequencing."
                 },
                 "race_linker": {
                     "type": "string",
