@@ -410,6 +410,7 @@ The following table matches the library generation methods as described in the [
 | RT(oligo-dT)+PCR                  | RT-PCR using oligo-dT primers                                                              | Not supported    |
 | RT(oligo-dT)+TS+PCR               | 5’-RACE PCR (i.e. RT is followed by a template switch (TS) step) using oligo-dT primers    | dt_5p_race       |
 | RT(oligo-dT)+TS(UMI)+PCR          | 5’-RACE PCR using oligo-dT primers and template switch primers containing UMI              | dt_5p_race_umi   |
+| RT(oligo-dT)+TS(UMI)+PCR          | As above, but reads already demultiplexed and trimmed, UMI in the read header               | dt_5p_race_umi_header |
 | RT(specific)+PCR                  | RT-PCR using transcript-specific primers                                                   | specific_pcr     |
 | RT(specific)+TS+PCR               | 5’-RACE PCR using transcript- specific primers                                             | Not supported    |
 | RT(specific)+TS(UMI)+PCR          | 5’-RACE PCR using transcript- specific primers and template switch primers containing UMIs | Not supported    |
@@ -528,6 +529,40 @@ nextflow run nf-core/airrflow -profile docker \
 --outdir ./results
 ```
 
+### 5'-RACE with the UMI in the read header
+
+Some sequencing facilities deliver reads that have already been demultiplexed and trimmed, with the
+UMI and the removed prefix recorded as annotations in the R1 header rather than left in the read.
+This is the case for the R24 rhesus macaque libraries. Set
+`--library_generation_method dt_5p_race_umi_header` for such data.
+
+The chemistry is the same as `dt_5p_race_umi` (AIRR `RT(oligo-dT)+TS(UMI)+PCR`); only the state of
+the reads differs. The R1 header must carry `UMI=` and `TRIM=` annotations appended after the
+Illumina comment, separated by `|`:
+
+```
+@M00001:1:000000000-AAAAA:1:1101:10:1 1:N:0:1|UMI=ACGTAC|TRIM=ACGTACGGATCC
+```
+
+R2 headers carry no annotations. Reads may be supplied gzipped or uncompressed, and the two may be
+mixed within one samplesheet.
+
+Because the primers, the template switch linker and the UMI have already been removed from the
+reads, this method **runs no primer masking**: `--cprimers`, `--vprimers`, `--race_linker` and
+`--umi_length` are rejected. It also **does not collapse duplicate sequences** and does not discard
+singletons, so every quality-passing read reaches V(D)J annotation. The steps run are: assemble read
+pairs (`AssemblePairs.py align --coord illumina --rc tail --1f UMI TRIM`, propagating the `UMI` and
+`TRIM` annotations onto the assembled sequence), quality filter (`FilterSeq.py quality`, threshold
+set by `--filterseq_q`, default 20), and conversion to FASTA.
+
+```bash
+nextflow run nf-core/airrflow -r <release> \
+--mode fastq \
+--input samplesheet.tsv \
+--library_generation_method dt_5p_race_umi_header \
+--outdir ./results
+```
+
 ## UMI barcode handling
 
 Unique Molecular Identifiers (UMIs) enable the quantification of BCR or TCR abundance in the original sample by allowing to distinguish PCR duplicates from original sample duplicates.
@@ -540,6 +575,8 @@ The UMI barcodes are typically read from an index file but sometimes can be prov
 - UMIs in R1 or R2 reads: if the UMIs are contained within the R1 or R2 reads, set the `--umi_position` parameter to `R1` or `R2`, respectively. Specify the UMI barcode length with the `--umi_length` parameter.
 
 - No UMIs in R1 or R2 reads: if no UMIs are present in the samples, specify `--umi_length 0` to use the sans-UMI subworkflow.
+
+- UMIs in the read header: if the reads arrive already demultiplexed and trimmed with the UMI recorded as a `UMI=` header annotation, set `--library_generation_method dt_5p_race_umi_header` and do not set `--umi_length`. See [5'-RACE with the UMI in the read header](#5-race-with-the-umi-in-the-read-header).
 
 ## Supported single cell library generation methods (protocols)
 
