@@ -127,7 +127,8 @@ def create_fastq_channels(LinkedHashMap col, collapseby, cloneby, index_file, gg
     meta.cloneby_group      = col[cloneby]
     meta.filetype           = "fastq"
     meta.single_cell        = col.single_cell.toLowerCase()
-    meta.locus              = col.pcr_target_locus
+    meta.locus              = locusClass( col.pcr_target_locus )
+    meta.locus_restriction  = locusRestriction( col.pcr_target_locus )
     meta.single_end         = false
     meta += ggsMeta(col, ggs)
 
@@ -172,7 +173,8 @@ def get_meta (LinkedHashMap col, ggs) {
     meta.filetype = col.filetype
     meta.single_cell = col.single_cell
     meta.pcr_target_locus = col.pcr_target_locus
-    meta.locus = col.locus
+    meta.locus = locusClass( col.locus )
+    meta.locus_restriction = locusRestriction( col.pcr_target_locus )
     meta += ggsMeta(col, ggs)
 
     if (!file(col.filename).exists()) {
@@ -180,6 +182,22 @@ def get_meta (LinkedHashMap col, ggs) {
     }
 
     return  [ meta, file(col.filename) ]
+}
+
+// The receptor class is what IgBLAST and Change-O work with; a single locus also
+// restricts the reference. Case is preserved: meta.locus reaches the FASTQ headers.
+def locusClass(value) {
+    def raw = value?.toString()?.trim()
+    def key = raw?.toUpperCase()
+    if (key in ['IG', 'TR']) { return raw }
+    if (key in ['IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRG', 'TRD']) { return raw.substring(0, 2) }
+    error "ERROR: Please check input samplesheet -> pcr_target_locus '${value}' must be one of: IG, TR, IGH, IGK, IGL, TRA, TRB, TRG, TRD."
+}
+
+// The single locus to restrict the reference to, or null for a whole class.
+def locusRestriction(value) {
+    def key = value?.toString()?.trim()?.toUpperCase()
+    return key in ['IGH', 'IGK', 'IGL', 'TRA', 'TRB', 'TRG', 'TRD'] ? key : null
 }
 
 def ggsMeta(col, ggs) {

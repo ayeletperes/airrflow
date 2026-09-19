@@ -1,0 +1,47 @@
+nextflow_pipeline {
+
+    name "Test pipeline"
+    script "../main.nf"
+    tag "pipeline"
+    profile "test_locus_restriction"
+
+    test("-profile test_locus_restriction") {
+
+        when {
+            params {
+                outdir = "$outputDir"
+            }
+        }
+
+        then {
+            // stable_name: All files + folders in ${params.outdir}/ with a stable name
+            def stable_name = getAllFilesFromDir(params.outdir, relative: true, includeDir: true, ignore: ['pipeline_info/*.{html,json,txt}'])
+            // stable_path: All files in ${params.outdir}/ with stable content
+            def stable_path = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
+            // One reference per distinct (species, locus): the two samples ask for
+            // IGH and IGK, so exactly two are built and published.
+            def references = new File("$outputDir/germline_reference").list().findAll { it.startsWith('gen_') }.sort()
+            // The point of restricting: the IGH reference must hold IGH genes and
+            // nothing else. Without this the test still passes if the restriction
+            // is silently ignored and the full reference is handed through.
+            def igh_vdj = new File("$outputDir/germline_reference/gen_human_IGH/reference_base/human/vdj").list().sort()
+            assertAll(
+                { assert workflow.success},
+                { assert references == ['gen_human_IGH', 'gen_human_IGK'] },
+                { assert igh_vdj == ['imgt_human_IGHD.fasta', 'imgt_human_IGHJ.fasta', 'imgt_human_IGHV.fasta'] },
+                { assert snapshot(
+                    // Number of successful tasks
+                    workflow.trace.succeeded().size(),
+                    // pipeline versions.yml file for multiqc from which Nextflow version is removed because we test pipelines on multiple Nextflow versions
+                    removeNextflowVersion("$outputDir/pipeline_info/nf_core_airrflow_software_mqc_versions.yml"),
+                    // All stable path name, with a relative path
+                    stable_name,
+                    // All files with stable contents
+                    stable_path,
+                    // Additional files that are excluded in .nftignore but need to be checked
+                    "$outputDir/repertoire_comparison/Sequence_numbers_summary/Table_sequences_assembled.tsv"
+                ).match() }
+            )
+        }
+    }
+}

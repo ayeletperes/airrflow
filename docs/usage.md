@@ -165,7 +165,7 @@ The required input file for processing raw BCR or TCR bulk targeted sequencing d
 - `subject_id`: Subject ID assigned by submitter, unique within study.
 - `species`: species from which the sample was taken. Supported species are `human` and `mouse`.
 - `tissue`: tissue from which the sample was taken. E.g. `blood`, `PBMC`, `brain`.
-- `pcr_target_locus`: Designation of the target locus (`IG` or `TR`).
+- `pcr_target_locus`: Designation of the target locus. Either a receptor class (`IG`, `TR`) or a single locus (`IGH`, `IGK`, `IGL`, `TRA`, `TRB`, `TRG`, `TRD`). Naming a single locus additionally restricts the germline reference used for that sample to that locus, see [Restricting the reference to a single locus](#restricting-the-reference-to-a-single-locus).
 - `biomaterial_provider`: Institution / research group that provided the samples.
 - `sex`: Subject biological sex (`female`, `male`, etc.).
 - `age`: Subject biological age.
@@ -223,23 +223,46 @@ An example samplesheet is:
 | sc5p_v2_hs_PBMC_1k_b_airr_rearrangement.tsv | human   | subject_x  | sc5p_v2_hs_PBMC_1k_5fb | PBMC   | NA   | NA  | 10x Genomics         | IG               | TRUE        |
 | bulk-Laserson-2014.fasta                    | human   | PGP1       | PGP1                   | PBMC   | male | NA  | Laserson-2014        | IG               | FALSE       |
 
+### Restricting the reference to a single locus
+
+:::warning
+Experimental and not yet part of the supported interface. The single-locus values are
+accepted and work, but they are undocumented on the nf-core website for now and may
+change. `IG` and `TR` remain the supported values.
+:::
+
+The `pcr_target_locus` column accepts either a receptor class (`IG`, `TR`) or a single locus (`IGH`, `IGK`, `IGL`, `TRA`, `TRB`, `TRG`, `TRD`). When a single locus is given, the germline reference used for that sample is restricted to that locus: the FASTAs of the other chains are dropped and the BLAST databases are rebuilt from what is left, so no gene outside the locus can be assigned. An example samplesheet mixing the two forms is:
+
+| filename                                    | species | subject_id | sample_id              | tissue | sex  | age | biomaterial_provider | pcr_target_locus | single_cell |
+| ------------------------------------------- | ------- | ---------- | ---------------------- | ------ | ---- | --- | -------------------- | ---------------- | ----------- |
+| sc5p_v2_hs_PBMC_1k_b_airr_rearrangement.tsv | human   | subject_x  | sc5p_v2_hs_PBMC_1k_5fb | PBMC   | NA   | NA  | 10x Genomics         | IGH              | TRUE        |
+| bulk-Laserson-2014.fasta                    | human   | PGP1       | PGP1                   | PBMC   | male | NA  | Laserson-2014        | IGK              | FALSE       |
+
+- `IG` or `TR`: the receptor class. Nothing is restricted and the run behaves exactly as it did before this feature existed — the full reference is used and no extra process runs.
+- `IGH`, `IGK`, `IGL`, `TRA`, `TRB`, `TRG`, `TRD`: a single locus. The reference is restricted to that locus, and to the sample's `species`.
+- Class D genes are always retained, whichever locus is named. `IGK`, `IGL`, `TRA` and `TRG` have no D genes of their own, and `AssignGenes.py --ddb` is not optional, so an `IGK`-restricted run sees exactly the D genes an `IG` run already gives it.
+- One reference is built per distinct `(species, locus)` pair, not per sample. Ten `IGH` samples across five subjects share a single build.
+
 ### Per-subject germline sets
 
 :::warning
-Under development. `--ggs_input` is a hidden parameter and its samplesheet columns are not yet a stable interface.
+Under development. `--ggs_input` is a hidden parameter and its samplesheet columns are
+not yet a stable interface. Do not rely on it in production runs.
 :::
 
-A personal germline set can be supplied per subject with `--ggs_input`, a second samplesheet in TSV format with the columns `subject_id` and `ggs_path`:
+A personal germline set can be supplied per subject with `--ggs_input`, a second samplesheet in TSV format (tab separated). The columns `subject_id` and `ggs_path` are required. An example is:
 
 | subject_id | ggs_path                      |
 | ---------- | ----------------------------- |
 | CE0007908  | /data/germline_sets/CE0007908 |
 | CE0006623  | /data/germline_sets/CE0006623 |
 
-- `subject_id`: matches the `subject_id` column of the main samplesheet.
-- `ggs_path`: a directory, or a `.zip` of one, with one sub-directory per locus (`IGH/`, `IGK/`, ...). Each holds `V_gapped_asc.fasta` (IMGT-gapped) and `J_asc.fasta`, plus `D_asc.fasta` for loci with D genes.
+- `subject_id`: Subject ID, matching the `subject_id` column of the main input samplesheet.
+- `ggs_path`: path to a directory holding that subject's personal germline set, laid out as `<subject_id>/<locus>/*.fasta`. Each locus directory holds `V_asc.fasta`, `J_asc.fasta` and `V_gapped_asc.fasta` (the IMGT-gapped V sequences), plus `D_asc.fasta` for the loci that have D genes.
 
-For the subjects listed, the V, D and J genes of every locus in their set replace the generic ones; constant regions stay generic. One reference is built per subject, and subjects not listed keep the generic reference, so both can be mixed in one run. The set must provide every locus the subject's samples target (`IG` needs `IGH`, `IGK` and `IGL`), or the build fails.
+The personal germline set is a **full replacement**, not a merge: for the subjects listed, the generic reference is not used at all, and only the alleles in the personal set can be assigned. Subjects absent from `--ggs_input` are unaffected and keep the generic reference, so the two can be mixed in one run.
+
+Every locus that a subject's samples declare in `pcr_target_locus` must be covered by that subject's germline set directory, or the run fails at validation. A subject whose samples declare the `IG` class needs `IGH`, `IGK` and `IGL`; a subject whose samples declare only `IGH` needs only `IGH`.
 
 ### Supported AIRR metadata fields
 
@@ -251,7 +274,7 @@ nf-core/airrflow offers full support for the [AIRR standards 1.4](https://docs.a
 | subject_id                | Samplesheet column |                               | Subject ID assigned by submitter, unique within study |
 | species                   | Samplesheet column |                               | Subject species                                       |
 | tissue                    | Samplesheet column |                               | Sample tissue                                         |
-| pcr_target_locus          | Samplesheet column |                               | Designation of the target locus (IG or TR)            |
+| pcr_target_locus          | Samplesheet column |                               | Target locus: a class (IG, TR) or a single locus      |
 | sex                       | Samplesheet column |                               | Subject sex                                           |
 | age                       | Samplesheet column |                               | Subject age                                           |
 | biomaterial_provider      | Samplesheet column |                               | Name of sample biomaterial provider                   |
@@ -614,17 +637,21 @@ nextflow run nf-core/airrflow \
 ## Germline reference options
 
 The germline reference is what every V(D)J assignment is made against, so it is worth
-being explicit about which one a run used. There are three supported ways to supply it, and per-subject germline sets are under development.
+being explicit about which one a run used. There are four ways to supply it. The first
+two are the supported interface; the last two are experimental and off by default.
 
-| Option                            | Parameters                                 | Scope       | Status            |
-| --------------------------------- | ------------------------------------------ | ----------- | ----------------- |
-| Cached reference bundle (default) | `--reference_fasta`, `--reference_igblast` | all samples | supported         |
-| Fetch at runtime                  | `--fetch_germlines imgt` or `airrc-imgt`   | all samples | supported         |
-| Your own custom reference         | `--reference_fasta`, `--reference_igblast` | all samples | supported         |
-| Per-subject germline sets         | `--ggs_input`                              | per subject | under development |
+| Option                            | Parameters                                  | Scope       | Status            |
+| --------------------------------- | ------------------------------------------- | ----------- | ----------------- |
+| Cached reference bundle (default) | `--reference_fasta`, `--reference_igblast`  | all samples | supported         |
+| Fetch at runtime                  | `--fetch_germlines imgt` or `airrc-imgt`    | all samples | supported         |
+| Your own custom reference         | `--reference_fasta`, `--reference_igblast`  | all samples | supported         |
+| Restrict to a single locus        | `pcr_target_locus` in the input samplesheet | per sample  | experimental      |
+| Per-subject germline sets         | `--ggs_input`                               | per subject | under development |
 
-Nothing changes for an existing run. `--generate_igblast_aux` defaults to `false` and `--ggs_input` to null;
-with neither set, no extra process runs and the reference is resolved exactly as it was before.
+Nothing changes for an existing run. `--ggs_input` defaults to null and
+`--generate_igblast_aux` to `false`; with neither set, no reference is built, no extra
+process runs, and the reference is resolved exactly as it was before these options
+existed.
 
 ### The cached reference bundle (default)
 
@@ -647,7 +674,8 @@ from: the built reference is published under `<outdir>/germline_reference/` when
 `--reference_fasta` and `--reference_igblast` also accept a reference you built yourself
 — an OGRDB set, a curated in-house set, or a set exported from a database such as HUSA.
 It replaces IMGT for **every** sample in the run. This is the right option for "annotate
-everything against my reference"; it needs no samplesheet change.
+everything against my reference"; it needs no `--ggs_input` and no samplesheet change,
+and it is independent of the per-subject germline sets described below.
 
 ```bash
 nextflow run nf-core/airrflow \
@@ -687,7 +715,7 @@ IgBLAST needs three germline-specific assets per species alongside the BLAST dat
 - `optional_file/<species>_gl.aux` — the reading frame of every J gene and the position of the conserved PHE/TRP that closes CDR3.
 - `internal_data/<species>/<species>_V` — the database IgBLAST uses to resolve a V hit's chain type.
 
-Both encode coordinates that are derived from a particular germline set. The copies NCBI ships with IgBLAST were derived from NCBI's own reference, so using them with a custom germline reference (for example one supplied with `--reference_fasta`) can mis-annotate the region boundaries and the J reading frames.
+Both encode coordinates that are derived from a particular germline set. The copies NCBI ships with IgBLAST were derived from NCBI's own reference, so using them with a custom germline reference (for example one supplied with `--reference_fasta`, or a per-subject reference) can mis-annotate the region boundaries and the J reading frames.
 
 Set `--generate_igblast_aux true` to rebuild all three from the germline reference actually in use before the annotation steps run. The reference is read per chain from the IMGT-gapped V and J FASTAs under `<reference>/<species>/vdj/`, one `.ndm` per V chain and one `.aux` per J chain, which are then merged into the single per-species file IgBLAST expects. The regenerated files replace the shipped ones inside the IgBLAST database directory; nothing else in that directory is touched, and other species keep their shipped files.
 

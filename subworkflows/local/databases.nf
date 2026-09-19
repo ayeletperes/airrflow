@@ -3,7 +3,7 @@ include { UNZIP_DB as UNZIP_IGBLAST } from '../../modules/local/unzip_db'
 include { UNZIP_DB as UNZIP_REFERENCE_FASTA } from '../../modules/local/unzip_db'
 include { VALIDATE_IGBLAST_DB } from '../../modules/local/validate_igblast_db'
 include { MAKE_IGBLAST_AUX } from '../../modules/local/make_igblast_aux'
-include { BUILD_GGS_REFERENCE } from '../../modules/local/build_ggs_reference'
+include { BUILD_GERMLINE_REFERENCE } from '../../modules/local/build_germline_reference'
 include { UNZIP_DB as UNZIP_GGS } from '../../modules/local/unzip_db'
 
 workflow DATABASES {
@@ -65,11 +65,14 @@ workflow DATABASES {
 
     ch_generic = ch_igblast.combine( ch_reference_fasta )
 
-    // One build per subject with a personal germline set; a .zip is unpacked first.
+    // One build per reference key: a personal germline set, a locus restriction, or both.
+    // A .zip germline set is unpacked first.
     ch_meta
-        .filter { meta -> meta.ggs_path }
-        .unique { meta -> meta.subject_id }
-        .map { meta -> [ [ id: "ggs_${meta.subject_id}", subject: meta.subject_id, species: meta.species, required_loci: meta.ggs_loci ], meta.ggs_path ] }
+        .filter { meta -> meta.ggs_path || meta.locus_restriction }
+        .unique { meta -> germlineKey(meta) }
+        .map { meta -> [ [ id: germlineKey(meta).replaceAll(':', '_'), key: germlineKey(meta), subject: meta.subject_id,
+                            species: meta.species, locus: meta.locus_restriction, required_loci: meta.ggs_loci ?: [] ],
+                            meta.ggs_path ?: '' ] }
         .branch { _meta, ggs ->
             zipped: ggs.endsWith('.zip')
             dir: true
@@ -78,8 +81,8 @@ workflow DATABASES {
 
     UNZIP_GGS( ch_ggs.zipped.map { _meta, ggs -> file(ggs) } )
 
-    BUILD_GGS_REFERENCE(
-        ch_ggs.dir.map { meta, ggs -> [ meta, file(ggs) ] }
+    BUILD_GERMLINE_REFERENCE(
+        ch_ggs.dir.map { meta, ggs -> [ meta, ggs ? file(ggs) : [] ] }
             .mix( ch_ggs.zipped
                 .map { meta, ggs -> [ file(ggs).simpleName, meta ] }
                 .combine( UNZIP_GGS.out.unzipped.map { dir -> [ dir.name, dir ] }, by: 0 )
@@ -91,10 +94,13 @@ workflow DATABASES {
     igblast = ch_igblast
     // channel: [ val(key), path(igblast_base), path(reference_base) ]
     reference_by_key = ch_generic.map { igblast, reference -> [ 'generic', igblast, reference ] }
-        .mix( BUILD_GGS_REFERENCE.out.reference.map { meta, igblast, reference -> [ "ggs:${meta.subject}".toString(), igblast, reference ] } )
+        .mix( BUILD_GERMLINE_REFERENCE.out.reference.map { meta, igblast, reference -> [ meta.key, igblast, reference ] } )
 }
 
-// Samples of a subject with a personal germline set use its build; the rest share the generic reference.
+// A subject with a personal germline set gets its own build; a restricted locus keys a
+// build of its own, shared by every sample restricted to that locus. The rest share the
+// generic reference.
 def germlineKey(meta) {
-    return meta.ggs_path ? "ggs:${meta.subject_id}".toString() : 'generic'
+    def key = meta.ggs_path ? "ggs:${meta.subject_id}" : 'generic'
+    return (meta.locus_restriction ? "${key}:${meta.locus_restriction}" : key).toString()
 }
