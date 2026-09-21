@@ -18,10 +18,11 @@ process PARSE_LOGS {
     path('assemble_pairs/*') //PRESTO_ASSEMBLEPAIRS logs
     path('deduplicates/*') //PRESTO_COLLAPSESEQ logs
     path('filter_representative_2/*') //PRESTO_SPLITSEQ logs
-    path('igblast/*') //CHANGEO_MAKEDB logs
+    path('igblast/*') //CHANGEO_MAKEDB logs, empty when V(D)J annotation was skipped
     path('metadata.tsv') //METADATA
     val umi_length
     val cluster_sets
+    val skip_vdj_annotation
 
     output:
     path "Table_sequences_process.tsv", emit: logs
@@ -30,15 +31,18 @@ process PARSE_LOGS {
     tuple val("${task.process}"), val('pandas'), eval('python -c "import pkg_resources; print(pkg_resources.get_distribution(\'pandas\').version)"'), emit: versions_pandas, topic: versions
 
     script:
-    if (umi_length == 0) {
+    def skip_annotation = skip_vdj_annotation? "--skip_vdj_annotation":""
+    // An unset '--umi_length' (-1) is only allowed for the library generation methods that run
+    // FilterSeq after assembly on a single read, which is the log shape the no-umi parser reads.
+    if (umi_length <= 0) {
         """
-        log_parsing_no-umi.py
+        log_parsing_no-umi.py $skip_annotation
 
         """
     } else {
         def clustersets = cluster_sets? "--cluster_sets":""
         """
-        log_parsing.py $clustersets
+        log_parsing.py $clustersets $skip_annotation
 
         """
     }

@@ -19,32 +19,28 @@ parser.add_argument(
     help="Including the cluster_sets process",
     action="store_true",
 )
+parser.add_argument(
+    "-s",
+    "--skip_vdj_annotation",
+    help="Excluding the igblast process, whose logs do not exist when V(D)J annotation was skipped",
+    action="store_true",
+)
 args = parser.parse_args()
 
 # Processes
+processes = [
+    "filter_by_sequence_quality",
+    "mask_primers",
+    "pair_sequences",
+    "build_consensus",
+    "repair_mates",
+    "assemble_pairs",
+    "deduplicates",
+]
+if not args.skip_vdj_annotation:
+    processes.append("igblast")
 if args.cluster_sets:
-    processes = [
-        "filter_by_sequence_quality",
-        "mask_primers",
-        "pair_sequences",
-        "build_consensus",
-        "repair_mates",
-        "assemble_pairs",
-        "deduplicates",
-        "igblast",
-        "cluster_sets",
-    ]
-else:
-    processes = [
-        "filter_by_sequence_quality",
-        "mask_primers",
-        "pair_sequences",
-        "build_consensus",
-        "repair_mates",
-        "assemble_pairs",
-        "deduplicates",
-        "igblast",
-    ]
+    processes.append("cluster_sets")
 
 # Path of logs will be:
 # process_name/sample_name_command_log.txt
@@ -365,10 +361,12 @@ df_process_list[5].to_csv(
     index=False,
 )
 df_process_list[6].to_csv(path_or_buf="Table_all_details_deduplicate.tsv", sep="\t", header=True, index=False)
-df_process_list[7].to_csv(path_or_buf="Table_all_details_igblast.tsv", sep="\t", header=True, index=False)
+
+if not args.skip_vdj_annotation:
+    df_process_list[7].to_csv(path_or_buf="Table_all_details_igblast.tsv", sep="\t", header=True, index=False)
 
 if args.cluster_sets:
-    df_process_list[8].to_csv(
+    df_process_list[-1].to_csv(
         path_or_buf="Table_all_details_cluster_sets.tsv",
         sep="\t",
         header=True,
@@ -387,7 +385,6 @@ colnames = [
     "Build_consensus",
     "Assemble_pairs",
     "Unique",
-    "Representative_2"
 ]
 
 print(df_process_list[0].sort_values(by=["Sample"]).pivot(index="Sample", columns="readtype"))
@@ -402,8 +399,13 @@ values = [
     df_process_list[4].set_index("Sample").loc[:, "pass_pairs"],
     df_process_list[5].set_index("Sample").loc[:, "pass_pairs"],
     df_process_list[6].set_index("Sample").loc[:, "keep"],
-    df_process_list[7].set_index("Sample").loc[:, "repres_2"]
 ]
+
+# Representative_2 is read off the igblast logs, so the column is left out altogether when
+# V(D)J annotation was skipped rather than filled with a count that was never measured.
+if not args.skip_vdj_annotation:
+    colnames.append("Representative_2")
+    values.append(df_process_list[7].set_index("Sample").loc[:, "repres_2"])
 
 final_table = pd.concat(values, axis=1, join="outer")
 final_table.columns = colnames

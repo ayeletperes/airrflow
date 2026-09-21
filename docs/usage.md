@@ -587,6 +587,11 @@ assembled sequences are wanted. The FASTA that is otherwise an intermediate is t
 | `dt_5p_race_umi_header`                                        | `presto/03-fasta/<sample>/`    |
 | `sc_10x_genomics`, `trust4`                                    | `vdj_annotation/convert-db/<sample>/` (published either way) |
 
+The pre-processing sequence counts are still written to `parsed_logs/Table_sequences_process.tsv`
+unless `--skip_report` is also set. The table then has one column per pre-processing step that ran
+and stops there: `Representative_2` is counted from the IgBLAST logs, so it is left out of the table
+altogether rather than reported as zero sequences.
+
 ## UMI barcode handling
 
 Unique Molecular Identifiers (UMIs) enable the quantification of BCR or TCR abundance in the original sample by allowing to distinguish PCR duplicates from original sample duplicates.

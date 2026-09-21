@@ -4,9 +4,23 @@
 # log_parsing_no-umi.py
 # Parsing log files for each of the steps for QC analysis.
 
+import os
 import pandas as pd
 import subprocess
 import re
+import argparse
+
+
+parser = argparse.ArgumentParser(
+    description="Parse logs to identify the number of sequences passing through every step."
+)
+parser.add_argument(
+    "-s",
+    "--skip_vdj_annotation",
+    help="Excluding the igblast process, whose logs do not exist when V(D)J annotation was skipped",
+    action="store_true",
+)
+args = parser.parse_args()
 
 # Processes
 processes = [
@@ -14,8 +28,14 @@ processes = [
     "filter_by_sequence_quality",
     "mask_primers",
     "deduplicates",
-    "igblast",
 ]
+if not args.skip_vdj_annotation:
+    processes.append("igblast")
+
+# Library generation methods differ in which pRESTO steps they run: 'dt_5p_race_umi_header'
+# reads already demultiplexed and trimmed reads, so neither MaskPrimers nor CollapseSeq runs
+# and no log directory is staged for them. Such a step is left out of the table altogether.
+processes = [process for process in processes if os.path.isdir(process)]
 
 # Path of logs will be:
 # process_name/sample_name_command_log.txt
@@ -305,44 +325,47 @@ for process in processes:
 
         df_process_list.append(df_process)
 
+dfs = {process: df.sort_values(by=["Sample"]) for process, df in zip(processes, df_process_list)}
+
+# Tables provide extra info and help debugging
+detail_tables = {
+    "assemble_pairs": "Table_all_details_assemble_mates.tsv",
+    "filter_by_sequence_quality": "Table_all_details_filter_quality.tsv",
+    "mask_primers": "Table_all_details_mask_primers.tsv",
+    "deduplicates": "Table_all_details_deduplicate.tsv",
+    "igblast": "Table_all_details_igblast.tsv",
+}
+for process, detail_table in detail_tables.items():
+    if process in dfs:
+        dfs[process].to_csv(path_or_buf=detail_table, sep="\t", header=True, index=False)
+
 colnames = [
     "Sample",
     "Sequences",
     "Assemble_pairs",
     "Filtered_quality",
-    "Mask_primers_R1",
-    "Mask_primers_R2",
-    "Unique",
-    "Representative_2"
 ]
-
-# Tables provide extra info and help debugging
-df_process_list[0].to_csv(
-    path_or_buf="Table_all_details_assemble_mates.tsv",
-    sep="\t",
-    header=True,
-    index=False,
-)
-df_process_list[1].to_csv(
-    path_or_buf="Table_all_details_filter_quality.tsv",
-    sep="\t",
-    header=True,
-    index=False,
-)
-df_process_list[2].to_csv(path_or_buf="Table_all_details_mask_primers.tsv", sep="\t", header=True, index=False)
-df_process_list[3].to_csv(path_or_buf="Table_all_details_deduplicate.tsv", sep="\t", header=True, index=False)
-df_process_list[4].to_csv(path_or_buf="Table_all_details_igblast.tsv", sep="\t", header=True, index=False)
-
 values = [
-    df_process_list[0].sort_values(by=["Sample"]).iloc[:, 0].tolist(),
-    df_process_list[0].sort_values(by=["Sample"]).loc[:, "start_pairs"].tolist(),
-    df_process_list[0].sort_values(by=["Sample"]).loc[:, "pass_pairs"].tolist(),
-    df_process_list[1].sort_values(by=["Sample"]).loc[:, "pass_pairs"].tolist(),
-    df_process_list[2].sort_values(by=["Sample"]).pivot(index="Sample", columns="readtype")["pass"]["R1"].tolist(),
-    df_process_list[2].sort_values(by=["Sample"]).pivot(index="Sample", columns="readtype")["pass"]["R2"].tolist(),
-    df_process_list[3].sort_values(by=["Sample"]).loc[:, "keep"].tolist(),
-    df_process_list[4].sort_values(by=["Sample"]).loc[:, "repres_2"].tolist()
+    dfs["assemble_pairs"].iloc[:, 0].tolist(),
+    dfs["assemble_pairs"].loc[:, "start_pairs"].tolist(),
+    dfs["assemble_pairs"].loc[:, "pass_pairs"].tolist(),
+    dfs["filter_by_sequence_quality"].loc[:, "pass_pairs"].tolist(),
 ]
+
+# A column is added only when the step it counts actually ran: a step that did not run is left
+# out of the table rather than reported as zero sequences.
+if "mask_primers" in dfs:
+    mask_primers_pass = dfs["mask_primers"].pivot(index="Sample", columns="readtype")["pass"]
+    colnames += ["Mask_primers_R1", "Mask_primers_R2"]
+    values += [mask_primers_pass["R1"].tolist(), mask_primers_pass["R2"].tolist()]
+
+if "deduplicates" in dfs:
+    colnames.append("Unique")
+    values.append(dfs["deduplicates"].loc[:, "keep"].tolist())
+
+if "igblast" in dfs:
+    colnames.append("Representative_2")
+    values.append(dfs["igblast"].loc[:, "repres_2"].tolist())
 
 final_table = dict(zip(colnames, values))
 print(final_table)

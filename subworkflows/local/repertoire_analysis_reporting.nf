@@ -47,7 +47,8 @@ workflow REPERTOIRE_ANALYSIS_REPORTING {
             ch_changeo_makedb_logs,
             ch_input,
             umi_length,
-            cluster_sets
+            cluster_sets,
+            false
         )
         ch_parsed_logs = PARSE_LOGS.out.logs
 

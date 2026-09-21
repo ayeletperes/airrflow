@@ -12,6 +12,7 @@
 */
 
 include { CHANGEO_CONVERTDB_FASTA as CHANGEO_CONVERTDB_FASTA_FROM_AIRR } from '../modules/local/changeo/changeo_convertdb_fasta'
+include { PARSE_LOGS } from '../modules/local/parse_logs'
 
 //
 // SUBWORKFLOW: Consisting of a mix of local and nf-core/modules
@@ -458,6 +459,27 @@ workflow AIRRFLOW {
 
         } else {
             log.info "Skipping V(D)J annotation and downstream steps because --skip_vdj_annotation was set."
+
+            // The pRESTO sequence counts are the only part of the reporting that survives without
+            // annotation, so emit them on their own instead of the full reporting subworkflow.
+            if (!skip_report && mode == "fastq" && library_generation_method != "sc_10x_genomics" && library_generation_method != "trust4") {
+                PARSE_LOGS(
+                    ch_presto_filterseq_logs.collect().ifEmpty([]),
+                    ch_presto_maskprimers_logs.collect().ifEmpty([]),
+                    ch_presto_pairseq_logs.collect().ifEmpty([]),
+                    ch_presto_clustersets_logs.collect().ifEmpty([]),
+                    ch_presto_buildconsensus_logs.collect().ifEmpty([]),
+                    ch_presto_postconsensus_pairseq_logs.collect().ifEmpty([]),
+                    ch_presto_assemblepairs_logs.collect().ifEmpty([]),
+                    ch_presto_collapseseq_logs.collect().ifEmpty([]),
+                    ch_presto_splitseq_logs.collect().ifEmpty([]),
+                    [],
+                    ch_input.collect(),
+                    umi_length,
+                    cluster_sets,
+                    true
+                )
+            }
         }
 
     //
