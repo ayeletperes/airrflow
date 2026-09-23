@@ -95,6 +95,8 @@ workflow AIRRFLOW {
         remove_chimeric
         detect_contamination
         genotypeby
+        genotype_method
+        allele_thresholds_db
         novel_allele_inference
         single_clone_representative
         genotyping_clonal_threshold
@@ -139,6 +141,17 @@ workflow AIRRFLOW {
         generate_igblast_aux
 
     main:
+
+        // Checked here rather than in NOVEL_ALLELES_AND_GENOTYPING because the reference channels
+        // built by DATABASES report `ifEmpty` errors when the session aborts, which would mask this.
+        if (genotyping) {
+            if (genotype_method == 'allele_based' && !allele_thresholds_db) {
+                error "The 'allele_based' genotype method requires an allele threshold table, please provide one with the '--allele_thresholds_db' option. Without it PIgLET applies a 1e-04 default threshold to every gene and silently reports a genotype that is not based on your data."
+            }
+            if (genotype_method != 'allele_based' && allele_thresholds_db) {
+                error "The '--allele_thresholds_db' option is only used by the 'allele_based' genotype method, but '--genotype_method' is '${genotype_method}'. Please set '--genotype_method allele_based' or remove '--allele_thresholds_db'."
+            }
+        }
 
         ch_versions = channel.empty()
         ch_reassign_logs = channel.empty()
@@ -378,6 +391,8 @@ workflow AIRRFLOW {
                     ch_validated_samplesheet.collect(),
                     ch_report_logo_img.collect().ifEmpty([]),
                     genotypeby,
+                    genotype_method,
+                    allele_thresholds_db,
                     novel_allele_inference,
                     single_clone_representative,
                     genotyping_clonal_threshold,

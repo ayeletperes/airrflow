@@ -796,6 +796,8 @@ These steps only support targeted BCR sequences for now. In addition, due to the
 2. `--single_clone_representative`: If it is set to be `true`, Keep only one representative sequence per clone for future genotype infernece to reduce the impact of clonal expansion and somatic hypermutation. If `--genotyping` is `true`, `single_clone_representative` is `true` by default.
 3. `--genotyping_clonal_threshold`: Threshold for determining if two sequences come from the same clone or not while inferring clones to find single clone representative. Default value is 0.2.
 4. `--novel_allele_inference`: whether to perform TIgGER novel allele inference. If `--genotyping` is `true`, `--single_clone_representative` is `true` by default.
+5. `--genotype_method`: which genotype inference method to run. `bayesian` (the default) runs TIgGER Bayesian genotype inference and is the appropriate choice for human data. `allele_based` runs PIgLET allele based genotype inference, which is the method to use for macaque (rhesus monkey) data.
+6. `--allele_thresholds_db`: path to the allele threshold table used by the `allele_based` method. It is required when `--genotype_method` is `allele_based` and is not accepted with any other method. If it is omitted, PIgLET would apply a 1e-04 default threshold to every gene rather than the thresholds measured for the germline reference in use, so the pipeline stops instead of reporting a genotype that is not based on your data.
 
 ## Important considerations for clonal analysis
 

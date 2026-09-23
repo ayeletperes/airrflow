@@ -606,6 +606,22 @@
                     "description": "Name of the field used to group data files to infer genotype.",
                     "fa_icon": "fab fa-pagelines"
                 },
+                "genotype_method": {
+                    "type": "string",
+                    "default": "bayesian",
+                    "description": "Method used to infer the genotype.",
+                    "help_text": "This parameter accepts two values. bayesian: TIgGER Bayesian genotype inference, suitable for human data. allele_based: PIgLET allele based genotype inference, required for macaque (rhesus monkey) data, which also requires the `--allele_thresholds_db` parameter.",
+                    "enum": ["bayesian", "allele_based"],
+                    "fa_icon": "fas fa-dna"
+                },
+                "allele_thresholds_db": {
+                    "type": "string",
+                    "format": "file-path",
+                    "exists": true,
+                    "description": "Path to the allele threshold table used by the `allele_based` genotype method.",
+                    "help_text": "Required when `--genotype_method` is `allele_based`, and not accepted otherwise. Without it PIgLET applies a 1e-04 default threshold to every gene instead of the thresholds measured for the germline reference in use.",
+                    "fa_icon": "fas fa-file"
+                },
                 "genotyping_clonal_threshold": {
                     "type": "number",
                     "default": 0.2,
