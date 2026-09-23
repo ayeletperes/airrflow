@@ -339,38 +339,44 @@ for process, detail_table in detail_tables.items():
     if process in dfs:
         dfs[process].to_csv(path_or_buf=detail_table, sep="\t", header=True, index=False)
 
-colnames = [
-    "Sample",
-    "Sequences",
-    "Assemble_pairs",
-    "Filtered_quality",
-]
-values = [
-    dfs["assemble_pairs"].iloc[:, 0].tolist(),
-    dfs["assemble_pairs"].loc[:, "start_pairs"].tolist(),
-    dfs["assemble_pairs"].loc[:, "pass_pairs"].tolist(),
-    dfs["filter_by_sequence_quality"].loc[:, "pass_pairs"].tolist(),
-]
+# Columns are keyed on the sample name and joined, not zipped: the steps do not necessarily all
+# see the same samples (a file with no reads can be logged by one step and not the next), and
+# lining the counts up by position reports one sample's counts under another sample's name.
+values = {
+    "Sequences": dfs["assemble_pairs"].set_index("Sample").loc[:, "start_pairs"],
+    "Assemble_pairs": dfs["assemble_pairs"].set_index("Sample").loc[:, "pass_pairs"],
+    "Filtered_quality": dfs["filter_by_sequence_quality"].set_index("Sample").loc[:, "pass_pairs"],
+}
 
 # A column is added only when the step it counts actually ran: a step that did not run is left
 # out of the table rather than reported as zero sequences.
 if "mask_primers" in dfs:
     mask_primers_pass = dfs["mask_primers"].pivot(index="Sample", columns="readtype")["pass"]
-    colnames += ["Mask_primers_R1", "Mask_primers_R2"]
-    values += [mask_primers_pass["R1"].tolist(), mask_primers_pass["R2"].tolist()]
+    values["Mask_primers_R1"] = mask_primers_pass["R1"]
+    values["Mask_primers_R2"] = mask_primers_pass["R2"]
 
 if "deduplicates" in dfs:
-    colnames.append("Unique")
-    values.append(dfs["deduplicates"].loc[:, "keep"].tolist())
+    values["Unique"] = dfs["deduplicates"].set_index("Sample").loc[:, "keep"]
 
 if "igblast" in dfs:
-    colnames.append("Representative_2")
-    values.append(dfs["igblast"].loc[:, "repres_2"].tolist())
+    values["Representative_2"] = dfs["igblast"].set_index("Sample").loc[:, "repres_2"]
 
-final_table = dict(zip(colnames, values))
-print(final_table)
-df_final_table = pd.DataFrame.from_dict(final_table)
+final_table = pd.concat(values.values(), axis=1, join="outer")
+final_table.columns = list(values.keys())
+df_final_table = final_table.rename_axis("Sample").reset_index()
 df_final_table = df_final_table.sort_values(["Sample"], ascending=[1])
+
+# A sample with no log for a step gets an empty cell, which is not the same fact as a zero: it
+# means the step left no log for it, not that the step ran and kept nothing. Worth reporting,
+# but not worth failing the run over: this table is reporting, not a gate.
+all_samples = set(df_final_table["Sample"])
+for colname, column in values.items():
+    no_log = sorted(all_samples.difference(column.index))
+    if no_log:
+        print(
+            "WARNING: %d of %d samples have no %s count: %s"
+            % (len(no_log), len(all_samples), colname, ", ".join(no_log))
+        )
 
 
 # incorporating metadata
@@ -378,4 +384,13 @@ metadata = pd.read_csv("metadata.tsv", sep="\t")
 metadata = metadata[metadata.columns.drop(list(metadata.filter(regex="filename")))]
 logs_metadata = metadata.merge(df_final_table, left_on="sample_id", right_on="Sample")
 logs_metadata = logs_metadata.drop(["Sample"], axis=1)
+
+# ponytail: a sample no step logged at all drops out of this merge, so it is named here rather
+# than given a row of empty counts.
+no_logs = sorted(set(metadata["sample_id"]).difference(logs_metadata["sample_id"]))
+if no_logs:
+    print(
+        "WARNING: %d of %d samples in the metadata have no logs at all and are missing from the "
+        "table: %s" % (len(no_logs), len(metadata["sample_id"]), ", ".join(map(str, no_logs)))
+    )
 logs_metadata.to_csv(path_or_buf="Table_sequences_process.tsv", sep="\t", header=True, index=False)
