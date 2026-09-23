@@ -121,6 +121,7 @@ params {
     remove_chimeric: Boolean = false
     detect_contamination: Boolean = false
     collapseby: String = 'sample_id'
+    collapse_report_args: String? = null
 
     // -----------------------
     // clonal analysis options
@@ -150,6 +151,7 @@ params {
     novel_allele_inference: Boolean = true
     genotyping_clonal_threshold: Float = 0.2
     single_clone_representative: Boolean = true
+    genotype_report_args: String? = null
 
     // -----------------------
     // translate embed options
