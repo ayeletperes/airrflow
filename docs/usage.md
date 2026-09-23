@@ -798,6 +798,21 @@ These steps only support targeted BCR sequences for now. In addition, due to the
 4. `--novel_allele_inference`: whether to perform TIgGER novel allele inference. If `--genotyping` is `true`, `--single_clone_representative` is `true` by default.
 5. `--genotype_method`: which genotype inference method to run. `bayesian` (the default) runs TIgGER Bayesian genotype inference and is the appropriate choice for human data. `allele_based` runs PIgLET allele based genotype inference, which is the method to use for macaque (rhesus monkey) data.
 6. `--allele_thresholds_db`: path to the allele threshold table used by the `allele_based` method. It is required when `--genotype_method` is `allele_based` and is not accepted with any other method. If it is omitted, PIgLET would apply a 1e-04 default threshold to every gene rather than the thresholds measured for the germline reference in use, so the pipeline stops instead of reporting a genotype that is not based on your data.
+7. `--genotype_report_args`: any remaining parameter of the genotype report that has no flag of its own, as `name=value` pairs separated by `;`. Both methods render the same report, so a parameter belonging to the other method is reported as ignored, and an unknown name fails the report rather than being silently dropped. For example, to restrict the input the genotype is inferred from:
+
+   ```bash
+   --genotype_report_args "unambiguous_v_only=true;unmutated_v_only=true;unmutated_d_only=true"
+   ```
+
+   Pairs are separated by `;` rather than `,` because some report parameters are themselves comma-separated, such as `v_priors=0.6,0.4`.
+
+`--collapse_report_args` works the same way for the duplicate collapsing report. It is the place to drop sequences whose alignment does not start at the first V nucleotide, before they reach clonal analysis, for protocols that sequence from that nucleotide:
+
+```bash
+--collapse_report_args "sequenced_from_v_start=true"
+```
+
+That report always shows how many sequences start later, per group, whether or not they are removed.
 
 ## Important considerations for clonal analysis
 
