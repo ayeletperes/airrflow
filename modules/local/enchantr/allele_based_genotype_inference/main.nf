@@ -12,22 +12,15 @@ process ALLELE_BASED_GENOTYPE_INFERENCE {
     label 'process_long_parallelized'
     label 'immcantation'
 
-    // ponytail: this pin is the reason this module is separate from
-    // BAYESIAN_GENOTYPE_INFERENCE. Bump it here when the enchantr image that knows
-    // 'piglet_genotype' is built; the bayesian module keeps 5.1.0.
-    container "docker.io/immcantation/airrflow:5.1.0"
+    container "docker.io/immcantation/airrflow:5.2.0dev"
 
     input:
     tuple val(meta), path(tabs), path(reference_fasta) // meta, sequence tsv in AIRR format
+    val genotypeby
     val single_clone_representative
     path allele_thresholds_db
 
     output:
-    // ponytail: this is the shape REASSIGN_ALLELES_GENOTYPE and the ch_repertoire_reference join
-    // require, not a shape the piglet report currently produces: its index.Rmd writes a flat
-    // `<outname>_personal_reference.fasta` into outdir and never calls generate_genotyped_reference,
-    // so there is no references/<id>/db_genotype directory. Left as the downstream contract rather
-    // than guessed at; the report has to emit this, or the join needs rewriting.
     tuple val(meta), path("*_report/references/*/db_genotype"), emit: reference // reference folder
     path("*/*_command_log.txt"), emit: logs //process logs
     path "*_report"
@@ -42,15 +35,13 @@ process ALLELE_BASED_GENOTYPE_INFERENCE {
     }
     def args = task.ext.args ? asString(task.ext.args) : ''
     def input = tabs.join(',')
-    // ponytail: piglet_genotype_project_files/index.Rmd names the germline `germline`, not
-    // `imgt_db`, and declares no `genotypeby`, so this is not the bayesian parameter list.
-    // Its remaining parameters (find_unmutated, single_assignments, default_threshold,
-    // translate_to_asc, asc_annotation, reassign, call/seq/germline/clone_id columns) have no
-    // airrflow option to map onto and are left at the template defaults.
+    // One enchantr report serves every genotype method; `method` selects PIgLET here.
     """
-    Rscript -e "enchantr::enchantr_report('piglet_genotype', \\
+    Rscript -e "enchantr::enchantr_report('genotype', \\
                                         report_params=list('input'='${input}', \\
-                                        'germline'='${reference_fasta}', \\
+                                        'imgt_db'='${reference_fasta}', \\
+                                        'genotypeby'='${genotypeby}', \\
+                                        'method'='allele_based', \\
                                         'allele_thresholds_db'='${allele_thresholds_db}', \\
                                         'single_clone_representative'='${single_clone_representative}', \\
                                         'outdir'=getwd(), \\

@@ -103,6 +103,7 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
     if (genotype_method == 'allele_based') {
         ALLELE_BASED_GENOTYPE_INFERENCE (
             ch_for_genotyping,
+            genotypeby,
             single_clone_representative,
             ch_allele_thresholds_db
         )
