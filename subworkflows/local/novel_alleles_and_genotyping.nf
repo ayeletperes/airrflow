@@ -1,5 +1,6 @@
 include { NOVEL_ALLELE_INFERENCE } from '../../modules/local/enchantr/novel_allele_inference'
 include { BAYESIAN_GENOTYPE_INFERENCE  } from '../../modules/local/enchantr/bayesian_genotype_inference'
+include { ALLELE_BASED_GENOTYPE_INFERENCE } from '../../modules/local/enchantr/allele_based_genotype_inference'
 include { REASSIGN_ALLELES as REASSIGN_ALLELES_NOVEL; REASSIGN_ALLELES as REASSIGN_ALLELES_GENOTYPE} from '../../modules/local/enchantr/reassign_alleles'
 include { CLONAL_ANALYSIS } from './clonal_analysis'
 include { CLONAL_ASSIGNMENT as CLONAL_ASSIGNMENT_GENOTYPING } from '../../modules/local/enchantr/clonal_assignment'
@@ -10,6 +11,8 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
     ch_validated_samplesheet
     ch_logo
     genotypeby
+    genotype_method
+    allele_thresholds_db
     novel_allele_inference
     single_clone_representative
     genotyping_clonal_threshold
@@ -18,6 +21,12 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
 
     main:
     ch_logs = channel.empty()
+
+    if (allele_thresholds_db) {
+        ch_allele_thresholds_db = channel.fromPath(allele_thresholds_db, checkIfExists: true)
+    } else {
+        ch_allele_thresholds_db = []
+    }
 
     // merge all repertoires by genotypeby metadata field
     ch_repertoire
@@ -91,18 +100,28 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
     }
 
     // infer genotype
-    BAYESIAN_GENOTYPE_INFERENCE (
-        ch_for_genotyping,
-        genotypeby,
-        single_clone_representative
-    )
+    if (genotype_method == 'allele_based') {
+        ALLELE_BASED_GENOTYPE_INFERENCE (
+            ch_for_genotyping,
+            single_clone_representative,
+            ch_allele_thresholds_db
+        )
+        ch_genotype_reference = ALLELE_BASED_GENOTYPE_INFERENCE.out.reference
+    } else {
+        BAYESIAN_GENOTYPE_INFERENCE (
+            ch_for_genotyping,
+            genotypeby,
+            single_clone_representative
+        )
+        ch_genotype_reference = BAYESIAN_GENOTYPE_INFERENCE.out.reference
+    }
 
     ch_grouped_repertoires
         .map{ it -> [it[0], it[1]] }
-        .join(BAYESIAN_GENOTYPE_INFERENCE.out.reference)
+        .join(ch_genotype_reference)
         .set{ ch_for_reassign }
 
-    BAYESIAN_GENOTYPE_INFERENCE.out.reference.dump(tag: "bayesian genotype inference out ref")
+    ch_genotype_reference.dump(tag: "genotype inference out ref")
 
 
     // reassign genotypes
@@ -114,7 +133,7 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
 
     REASSIGN_ALLELES_GENOTYPE.out.tab.dump(tag: "reassign alleles genotype out tab")
 
-    ch_repertoire_reference = REASSIGN_ALLELES_GENOTYPE.out.tab.join(BAYESIAN_GENOTYPE_INFERENCE.out.reference)
+    ch_repertoire_reference = REASSIGN_ALLELES_GENOTYPE.out.tab.join(ch_genotype_reference)
     ch_repertoire_reference.dump(tag: "ch_repertoire_reference_genotyping")
 
 

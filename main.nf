@@ -145,6 +145,8 @@ params {
     // -----------------------
     genotyping: Boolean = false
     genotypeby: String = 'subject_id'
+    genotype_method: String = 'bayesian'
+    allele_thresholds_db: String? = null
     novel_allele_inference: Boolean = true
     genotyping_clonal_threshold: Float = 0.2
     single_clone_representative: Boolean = true
@@ -290,6 +292,8 @@ workflow NFCORE_AIRRFLOW {
         params.remove_chimeric,
         params.detect_contamination,
         params.genotypeby,
+        params.genotype_method,
+        params.allele_thresholds_db,
         params.novel_allele_inference,
         params.single_clone_representative,
         params.genotyping_clonal_threshold,
