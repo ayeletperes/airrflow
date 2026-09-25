@@ -7,7 +7,7 @@ process REPORT_FILE_SIZE {
     label 'process_single'
     label 'immcantation_container'
 
-    container "docker.io/immcantation/airrflow:5.2.0dev"
+    container "docker.io/peresay/airrflow:5.2.0dev-rm-490ca1b"
 
     input:
     path logs
