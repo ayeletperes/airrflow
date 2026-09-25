@@ -22,6 +22,11 @@ from receptor_utils import simple_bio_seq as simple
 
 V_CODE = {"IGHV": "VH", "IGKV": "VK", "IGLV": "VL",
           "TRAV": "VA", "TRBV": "VB", "TRDV": "VD", "TRGV": "VG"}
+
+# IgBLAST looks these files up by organism, from a closed vocabulary of its own, so
+# they have to be named for it rather than for the reference directory they come
+# from. sourcerer names the macaque 'rhesus'; IgBLAST calls it 'rhesus_monkey'.
+IGBLAST_ORGANISM = {"rhesus": "rhesus_monkey"}
 J_CHAINS = ["IGHJ", "IGKJ", "IGLJ", "TRAJ", "TRBJ", "TRDJ", "TRGJ"]
 
 
@@ -66,14 +71,16 @@ def build(vdj, work, cdr_coords):
     return ndm_header, ndm, aux_header, aux
 
 
-def annotation_db(out, species):
+def annotation_db(out, species, organism=None):
     # This ships as NCBI's IMGT mirror. An allele missing from it gets no chain
-    # type, and IgBLAST then skips the D and J search entirely.
-    for locus_class, name in (("ig", f"{species}_V"), ("tr", f"{species}_TR_V")):
+    # type, and IgBLAST then skips the D and J search entirely. The FASTAs are named
+    # after the reference, the destination after the organism IgBLAST looks up.
+    organism = organism or species
+    for locus_class, name in (("ig", f"{organism}_V"), ("tr", f"{organism}_TR_V")):
         src = out / "fasta" / f"{species}_{locus_class}_v.fasta"
         if not src.is_file() or src.stat().st_size == 0:
             continue
-        dest = out / "internal_data" / species / name
+        dest = out / "internal_data" / organism / name
         dest.parent.mkdir(parents=True, exist_ok=True)
         subprocess.run(["makeblastdb", "-parse_seqids", "-dbtype", "nucl",
                         "-in", str(src), "-out", str(dest)],
@@ -131,10 +138,12 @@ def main():
         if not ndm or not aux:
             sys.exit(f"{d.name}: derived {len(ndm)} V delineations and {len(aux)} J "
                      f"annotations from {d / 'vdj'}. Are the V references IMGT-gapped?")
-        write(a.out / "internal_data" / d.name / f"{d.name}.ndm.imgt", ndm_header, ndm)
-        write(a.out / "optional_file" / f"{d.name}_gl.aux", aux_header, aux)
-        annotation_db(a.out, d.name)
-        print(f"{d.name}: {len(ndm)} ndm records, {len(aux)} aux records")
+        organism = IGBLAST_ORGANISM.get(d.name, d.name)
+        write(a.out / "internal_data" / organism / f"{organism}.ndm.imgt", ndm_header, ndm)
+        write(a.out / "optional_file" / f"{organism}_gl.aux", aux_header, aux)
+        annotation_db(a.out, d.name, organism)
+        named = f" as {organism}" if organism != d.name else ""
+        print(f"{d.name}: {len(ndm)} ndm records, {len(aux)} aux records{named}")
 
     shutil.rmtree(work)
 

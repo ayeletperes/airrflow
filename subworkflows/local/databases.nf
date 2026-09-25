@@ -48,7 +48,7 @@ workflow DATABASES {
         ch_igblast = VALIDATE_IGBLAST_DB.out.igblast
     }
 
-    if (fetch_germlines == "imgt" || fetch_germlines == "airrc-imgt") {
+    if (fetch_germlines in ["imgt", "airrc-imgt", "ogrdb"]) {
         FETCH_DATABASES(channel.value(fetch_germlines))
         ch_igblast = FETCH_DATABASES.out.igblast
         ch_reference_fasta = FETCH_DATABASES.out.reference_fasta

@@ -4,7 +4,7 @@ process MAKE_IGBLAST_AUX {
     // No conda directive: receptor_utils is pip-only, it is not on bioconda.
     // The sourcerer image carries receptor_utils and makeblastdb, which the
     // internal_data annotation database rebuild needs.
-    container "docker.io/peresay/airrflow-sourcerer:sourcerer-bf1223f-5"
+    container "docker.io/peresay/airrflow-sourcerer:sourcerer-560cd41-1"
 
     input:
     path(igblast_dir, stageAs: "input_igblast_base")

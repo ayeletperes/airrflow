@@ -22,11 +22,17 @@ process CHANGEO_ASSIGNGENES {
     def args = task.ext.args ?: ''
     def species = meta.species.toLowerCase()
     def loci = meta.locus.toLowerCase()
+    // IgBLAST takes the organism from a closed vocabulary and uses it to find
+    // internal_data/<organism> and optional_file/<organism>_gl.aux. The germline
+    // databases are named after the reference instead, and are passed by name, so
+    // the two do not have to agree. Change-O rejects an organism it does not know.
+    // sourcerer names the macaque 'rhesus'; IgBLAST calls it 'rhesus_monkey'.
+    def organism = ['rhesus': 'rhesus_monkey'].getOrDefault(species, species)
     """
     AssignGenes.py igblast \\
         -s $reads \\
         -b $igblast \\
-        --organism $meta.species \\
+        --organism ${organism} \\
         --loci ${loci} \\
         --vdb ${species}_${loci}_v \\
         --ddb ${species}_${loci}_d \\
