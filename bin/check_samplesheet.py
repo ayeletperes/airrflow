@@ -167,18 +167,23 @@ def check_samplesheet(file_in, assembled):
             else:
                 print("WARNING: Sample IDs are not unique! FastQs with the same sample ID will be merged.")
 
-        ## Check that pcr_target_locus is IG or TR
+        ## Check that pcr_target_locus is a receptor class or a single locus
+        # A single locus says the library targets that chain only, which lets the
+        # duplicate collapsing step drop sequences assigned elsewhere.
+        valid_loci = ["IG", "TR", "IGH", "IGI", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD"]
         for val in tab["pcr_target_locus"]:
-            if val.upper() not in ["IG", "TR"]:
-                print_error("pcr_target_locus must be one of: IG, TR.")
+            if val.upper() not in valid_loci:
+                print_error("pcr_target_locus must be one of: {}.".format(", ".join(valid_loci)))
 
         ## Check that species is one of the supported species
-        # ponytail: rhesus_monkey is accepted so the samplesheet can state the real species,
-        # but only human and mouse have a germline reference. A rhesus_monkey run needs its own
-        # --reference_fasta/--reference_igblast or --skip_vdj_annotation. Widening the reference
-        # tooling (sourcerer SPECIES, ref2igblast.sh, validate_igblast_db.sh) is a separate change.
+        # The value has to name the germline reference as well as the organism: it
+        # selects <species>/vdj/ in the reference, the <species>_<ig|tr>_<v|d|j|c>
+        # BLAST databases, and IgBLAST's internal_data/<species> and
+        # optional_file/<species>_gl.aux. 'rhesus' is what a fetched reference
+        # carries; 'rhesus_monkey' is IgBLAST's own token, for a reference built
+        # against it.
         for val in tab["species"]:
-            if val not in ["human", "mouse", "rhesus_monkey"]:
+            if val not in ["human", "mouse", "rhesus", "rhesus_monkey"]:
                 print_error(
                     "species must be one of: human, mouse, rhesus_monkey."
                 )

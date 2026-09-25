@@ -13,7 +13,7 @@ process COLLAPSE_DUPLICATES {
     label 'immcantation'
     label 'immcantation_container'
 
-    container "docker.io/immcantation/airrflow:5.2.0dev"
+    container "docker.io/peresay/airrflow:5.2.0dev-rm-490ca1b"
 
     input:
     tuple val(meta), path(tabs) // tuple [val(meta), compressed sequence tsv in AIRR format ]
@@ -36,6 +36,7 @@ process COLLAPSE_DUPLICATES {
     Rscript -e "enchantr::enchantr_report('collapse_duplicates', \\
         report_params=list('input'='tabs.txt',\\
         'collapseby'='${collapseby}',\\
+        'locus'='${meta.pcr_target_locus ?: meta.locus}',\\
         'outdir'=getwd(),\\
         'nproc'=${task.cpus},\\
         'outname'='${meta.id}',\\

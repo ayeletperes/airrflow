@@ -20,12 +20,14 @@
             },
             "species": {
                 "type": "string",
-                "enum": ["mouse", "human", "rhesus_monkey"],
-                "errorMessage": "Species name must be provided and must be one of: mouse, human, rhesus_monkey."
+                "enum": ["mouse", "human", "rhesus", "rhesus_monkey"],
+                "errorMessage": "Species name must be provided and must be one of: mouse, human, rhesus, rhesus_monkey."
             },
             "pcr_target_locus": {
                 "type": "string",
-                "enum": ["TR", "IG", "ig", "tr", "Ig", "Tr"],
+                "enum": ["TR", "IG", "ig", "tr", "Ig", "Tr",
+                         "IGH", "IGI", "IGK", "IGL", "TRA", "TRB", "TRG", "TRD",
+                         "igh", "igi", "igk", "igl", "tra", "trb", "trg", "trd"],
                 "errorMessage": "PCR target locus must be provided and must be one of: TR, IG."
             },
             "tissue": {
