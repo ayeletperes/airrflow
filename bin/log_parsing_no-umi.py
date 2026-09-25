@@ -32,7 +32,7 @@ processes = [
 if not args.skip_vdj_annotation:
     processes.append("igblast")
 
-# Library generation methods differ in which pRESTO steps they run: 'dt_5p_race_umi_header'
+# Library generation methods differ in which pRESTO steps they run: 'dt_5p_ts_header'
 # reads already demultiplexed and trimmed reads, so neither MaskPrimers nor CollapseSeq runs
 # and no log directory is staged for them. Such a step is left out of the table altogether.
 processes = [process for process in processes if os.path.isdir(process)]

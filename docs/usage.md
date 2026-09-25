@@ -175,7 +175,10 @@ The required input file for processing raw BCR or TCR bulk targeted sequencing d
   `--reference_fasta` / `--reference_igblast`, or stop before annotation with
   `--skip_vdj_annotation`.
 - `tissue`: tissue from which the sample was taken. E.g. `blood`, `PBMC`, `brain`.
-- `pcr_target_locus`: Designation of the target locus (`IG` or `TR`).
+- `pcr_target_locus`: Designation of the target locus. Either a receptor class (`IG`, `TR`) or a
+  single locus (`IGH`, `IGI`, `IGK`, `IGL`, `TRA`, `TRB`, `TRG`, `TRD`). Naming a single locus lets
+  duplicate collapsing drop sequences assigned to another locus, see
+  [`--collapse_report_args`](#fetching-the-reference-at-runtime).
 - `biomaterial_provider`: Institution / research group that provided the samples.
 - `sex`: Subject biological sex (`female`, `male`, etc.).
 - `age`: Subject biological age.
@@ -420,7 +423,7 @@ The following table matches the library generation methods as described in the [
 | RT(oligo-dT)+PCR                  | RT-PCR using oligo-dT primers                                                              | Not supported    |
 | RT(oligo-dT)+TS+PCR               | 5’-RACE PCR (i.e. RT is followed by a template switch (TS) step) using oligo-dT primers    | dt_5p_race       |
 | RT(oligo-dT)+TS(UMI)+PCR          | 5’-RACE PCR using oligo-dT primers and template switch primers containing UMI              | dt_5p_race_umi   |
-| RT(oligo-dT)+TS(UMI)+PCR          | As above, but reads already demultiplexed and trimmed, UMI in the read header               | dt_5p_race_umi_header |
+| RT(oligo-dT)+TS+PCR               | As above without UMIs, reads already demultiplexed and trimmed, trimmed prefix in the header | dt_5p_ts_header |
 | RT(specific)+PCR                  | RT-PCR using transcript-specific primers                                                   | specific_pcr     |
 | RT(specific)+TS+PCR               | 5’-RACE PCR using transcript- specific primers                                             | Not supported    |
 | RT(specific)+TS(UMI)+PCR          | 5’-RACE PCR using transcript- specific primers and template switch primers containing UMIs | Not supported    |
@@ -539,16 +542,20 @@ nextflow run nf-core/airrflow -profile docker \
 --outdir ./results
 ```
 
-### 5'-RACE with the UMI in the read header
+### Template switch with the trimmed prefix in the read header
 
 Some sequencing facilities deliver reads that have already been demultiplexed and trimmed, with the
-UMI and the removed prefix recorded as annotations in the R1 header rather than left in the read.
-This is the case for the R24 rhesus macaque libraries. Set
-`--library_generation_method dt_5p_race_umi_header` for such data.
+removed prefix recorded as an annotation in the R1 header rather than left in the read. This is the
+case for the R24 rhesus macaque libraries. Set `--library_generation_method dt_5p_ts_header` for
+such data.
 
-The chemistry is the same as `dt_5p_race_umi` (AIRR `RT(oligo-dT)+TS(UMI)+PCR`); only the state of
-the reads differs. The R1 header must carry `UMI=` and `TRIM=` annotations appended after the
-Illumina comment, separated by `|`:
+The chemistry is RT with oligo-dT primers, a template switch, then PCR with a constant region
+primer (AIRR `RT(oligo-dT)+TS+PCR`). **There is no UMI.** The libraries carry a short run of
+diversity bases in front of the sample barcode, and some facilities record them as a `UMI=`
+annotation, but they are not molecular identifiers: in the R24 libraries those six bases take all
+4,096 possible values across a single library, so they identify nothing and nothing in this pipeline
+reads them. The R1 header carries the annotations appended after the Illumina comment, separated by
+`|`:
 
 ```
 @M00001:1:000000000-AAAAA:1:1101:10:1 1:N:0:1|UMI=ACGTAC|TRIM=ACGTACGGATCC
@@ -557,19 +564,19 @@ Illumina comment, separated by `|`:
 R2 headers carry no annotations. Reads may be supplied gzipped or uncompressed, and the two may be
 mixed within one samplesheet.
 
-Because the primers, the template switch linker and the UMI have already been removed from the
-reads, this method **runs no primer masking**: `--cprimers`, `--vprimers`, `--race_linker` and
-`--umi_length` are rejected. It also **does not collapse duplicate sequences** and does not discard
-singletons, so every quality-passing read reaches V(D)J annotation. The steps run are: assemble read
-pairs (`AssemblePairs.py align --coord illumina --rc tail --1f UMI TRIM`, propagating the `UMI` and
-`TRIM` annotations onto the assembled sequence), quality filter (`FilterSeq.py quality`, threshold
-set by `--filterseq_q`, default 20), and conversion to FASTA.
+Because the primers and the template switch linker have already been removed from the reads, this
+method **runs no primer masking**: `--cprimers`, `--vprimers`, `--race_linker` and `--umi_length`
+are rejected. The steps run are: assemble read pairs (`AssemblePairs.py align --coord illumina --rc
+tail --1f UMI TRIM`, carrying the header annotations onto the assembled sequence), quality filter
+(`FilterSeq.py quality`, threshold set by `--filterseq_q`, default 20), collapse duplicate sequences
+(`CollapseSeq.py -n 0 --keepmiss`, which records how many reads each sequence stands for as
+`DUPCOUNT`), and conversion to FASTA.
 
 ```bash
 nextflow run nf-core/airrflow -r <release> \
 --mode fastq \
 --input samplesheet.tsv \
---library_generation_method dt_5p_race_umi_header \
+--library_generation_method dt_5p_ts_header \
 --outdir ./results
 ```
 
@@ -584,7 +591,7 @@ assembled sequences are wanted. The FASTA that is otherwise an intermediate is t
 | ------------------------------------------------------------- | ------------------------------ |
 | `specific_pcr_umi`, `dt_5p_race_umi`                           | `presto/10-splitseq/<sample>/` |
 | `specific_pcr`, `dt_5p_race`                                   | `presto/05-splitseq/<sample>/` |
-| `dt_5p_race_umi_header`                                        | `presto/03-fasta/<sample>/`    |
+| `dt_5p_ts_header`                                        | `presto/03-fasta/<sample>/`    |
 | `sc_10x_genomics`, `trust4`                                    | `vdj_annotation/convert-db/<sample>/` (published either way) |
 
 The pre-processing sequence counts are still written to `parsed_logs/Table_sequences_process.tsv`
@@ -605,7 +612,7 @@ The UMI barcodes are typically read from an index file but sometimes can be prov
 
 - No UMIs in R1 or R2 reads: if no UMIs are present in the samples, specify `--umi_length 0` to use the sans-UMI subworkflow.
 
-- UMIs in the read header: if the reads arrive already demultiplexed and trimmed with the UMI recorded as a `UMI=` header annotation, set `--library_generation_method dt_5p_race_umi_header` and do not set `--umi_length`. See [5'-RACE with the UMI in the read header](#5-race-with-the-umi-in-the-read-header).
+- Reads already demultiplexed and trimmed: if the trimmed prefix is recorded as a header annotation rather than left in the read, set `--library_generation_method dt_5p_ts_header` and do not set `--umi_length`. See [Template switch with the trimmed prefix in the read header](#template-switch-with-the-trimmed-prefix-in-the-read-header).
 
 ## Supported single cell library generation methods (protocols)
 
@@ -704,6 +711,11 @@ months apart give the same assignments.
 
 `--fetch_germlines imgt` or `--fetch_germlines airrc-imgt` downloads and builds the
 reference at the start of the run instead, the latter overlaying the AIRR-C set on IMGT.
+`--fetch_germlines ogrdb` takes only what OGRDB publishes, with no IMGT fallback: use it
+for a species whose IMGT alignment you do not want in the reference at all. What each
+source covers is decided by sourcerer, not by this pipeline, so a species missing from a
+source simply does not appear in the built reference.
+
 This always takes the current upstream release, so record which release a result came
 from: the built reference is published under `<outdir>/germline_reference/` when
 `--save_germlines` is set.
@@ -813,6 +825,15 @@ These steps only support targeted BCR sequences for now. In addition, due to the
 ```
 
 That report always shows how many sequences start later, per group, whether or not they are removed.
+
+It also counts the sequences per assigned locus: a library that targets one locus can still be
+handed a sequence assigned to another, since the aligner reports the best match in whatever
+reference it was given. Name the targeted locus in `pcr_target_locus` (`IGH` rather than `IG`) and
+add `restrict_to_locus=true` to drop the rest before clonal analysis:
+
+```bash
+--collapse_report_args "restrict_to_locus=true"
+```
 
 ## Important considerations for clonal analysis
 

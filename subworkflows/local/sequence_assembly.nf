@@ -16,7 +16,7 @@
 // Local: Sub-workflows
 include { PRESTO_UMI                  } from '../../subworkflows/local/presto_umi'
 include { PRESTO_SANS_UMI             } from '../../subworkflows/local/presto_sans_umi'
-include { PRESTO_UMI_HEADER           } from '../../subworkflows/local/presto_umi_header'
+include { PRESTO_TS_HEADER           } from '../../subworkflows/local/presto_ts_header'
 
 /*
 ~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~~
@@ -185,23 +185,23 @@ workflow SEQUENCE_ASSEMBLY {
         if (internal_cregion_sequences) {
             error "Please do not set '--internal_cregion_sequences' when using the 'dt_5p_race' library generation method without UMIs."
         }
-    } else if (library_generation_method == 'dt_5p_race_umi_header') {
+    } else if (library_generation_method == 'dt_5p_ts_header') {
         if (vprimers) {
-            error "The 'dt_5p_race_umi_header' library generation method expects reads that are already demultiplexed and trimmed, so there are no primers left to mask: please do not set '--vprimers'."
+            error "The 'dt_5p_ts_header' library generation method expects reads that are already demultiplexed and trimmed, so there are no primers left to mask: please do not set '--vprimers'."
         }
         if (cprimers) {
-            error "The 'dt_5p_race_umi_header' library generation method expects reads that are already demultiplexed and trimmed, so there are no primers left to mask: please do not set '--cprimers'."
+            error "The 'dt_5p_ts_header' library generation method expects reads that are already demultiplexed and trimmed, so there are no primers left to mask: please do not set '--cprimers'."
         }
         if (race_linker) {
-            error "The 'dt_5p_race_umi_header' library generation method expects the template switch linker to have been trimmed already (it is recorded in the TRIM= read header annotation): please do not set '--race_linker'."
+            error "The 'dt_5p_ts_header' library generation method expects the template switch linker to have been trimmed already (it is recorded in the TRIM= read header annotation): please do not set '--race_linker'."
         }
         if (umi_length > 0) {
-            error "The 'dt_5p_race_umi_header' library generation method reads the UMI from the UMI= annotation in the R1 header, not from the sequence: please do not set '--umi_length'. Use 'dt_5p_race_umi' if the UMI is still in the read."
+            error "The 'dt_5p_ts_header' library generation method reads the UMI from the UMI= annotation in the R1 header, not from the sequence: please do not set '--umi_length'. Use 'dt_5p_race_umi' if the UMI is still in the read."
         } else {
             umi_length = 0
         }
         if (internal_cregion_sequences) {
-            error "Please do not set '--internal_cregion_sequences' when using the 'dt_5p_race_umi_header' library generation method: no C-region alignment is performed."
+            error "Please do not set '--internal_cregion_sequences' when using the 'dt_5p_ts_header' library generation method: no C-region alignment is performed."
         }
     } else {
         error "The provided library generation method is not supported. Please check the docs for `--library_generation_method`."
@@ -214,22 +214,22 @@ workflow SEQUENCE_ASSEMBLY {
 
     ch_versions = channel.empty()
 
-    if (library_generation_method == 'dt_5p_race_umi_header') {
+    if (library_generation_method == 'dt_5p_ts_header') {
         //
         // SUBWORKFLOW: pRESTO on reads whose UMI is already a header annotation
         //
-        PRESTO_UMI_HEADER(
+        PRESTO_TS_HEADER(
             ch_reads,
             filterseq_q
         )
-        ch_presto_fasta = PRESTO_UMI_HEADER.out.fasta
-        ch_fastqc_postassembly = PRESTO_UMI_HEADER.out.fastqc_postassembly_gz
-        ch_presto_assemblepairs_logs = PRESTO_UMI_HEADER.out.presto_assemblepairs_logs
-        ch_presto_filterseq_logs = PRESTO_UMI_HEADER.out.presto_filterseq_logs
+        ch_presto_fasta = PRESTO_TS_HEADER.out.fasta
+        ch_fastqc_postassembly = PRESTO_TS_HEADER.out.fastqc_postassembly_gz
+        ch_presto_assemblepairs_logs = PRESTO_TS_HEADER.out.presto_assemblepairs_logs
+        ch_presto_filterseq_logs = PRESTO_TS_HEADER.out.presto_filterseq_logs
         ch_fastp_reads_html = channel.empty()
         ch_fastp_reads_json = channel.empty()
         ch_presto_maskprimers_logs = channel.empty()
-        ch_presto_collapseseq_logs = channel.empty()
+        ch_presto_collapseseq_logs = PRESTO_TS_HEADER.out.presto_collapseseq_logs
         ch_presto_splitseq_logs = channel.empty()
         ch_presto_pairseq_logs = channel.empty()
         ch_presto_clustersets_logs = channel.empty()

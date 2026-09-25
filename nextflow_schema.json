@@ -84,11 +84,11 @@
                         "specific_pcr",
                         "dt_5p_race",
                         "dt_5p_race_umi",
-                        "dt_5p_race_umi_header",
+                        "dt_5p_ts_header",
                         "sc_10x_genomics",
                         "trust4"
                     ],
-                    "help_text": "Available protocols are:\n- `specific_pcr_umi`: RT-PCR using transcript-specific primers containing UMIs.\n- `specific_pcr`: RT-PCR using transcript-specific primers.\n- `dt_5p_race_umi`: 5\u2019-RACE PCR using oligo-dT primers and template switch primers containing UMI.\n- `dt_5p_race`: 5\u2019-RACE PCR (i.e. RT is followed by a template switch (TS) step) using oligo-dT primers.\n- `dt_5p_race_umi_header`: same chemistry as `dt_5p_race_umi`, but the reads arrive already demultiplexed and trimmed, with the UMI and the trimmed prefix recorded as `UMI=` and `TRIM=` annotations in the R1 header. No primer masking and no duplicate collapsing are performed.\n- `sc_10x_genomics`:10x genomics library preparation protocol for scVDJ sequencing."
+                    "help_text": "Available protocols are:\n- `specific_pcr_umi`: RT-PCR using transcript-specific primers containing UMIs.\n- `specific_pcr`: RT-PCR using transcript-specific primers.\n- `dt_5p_race_umi`: 5\u2019-RACE PCR using oligo-dT primers and template switch primers containing UMI.\n- `dt_5p_race`: 5\u2019-RACE PCR (i.e. RT is followed by a template switch (TS) step) using oligo-dT primers.\n- `dt_5p_ts_header`: RT with oligo-dT primers followed by a template switch, then PCR with a constant region primer, with no UMI. The reads arrive already demultiplexed and trimmed, with the trimmed prefix recorded as a `TRIM=` annotation in the R1 header. No primer masking is performed.\n- `sc_10x_genomics`:10x genomics library preparation protocol for scVDJ sequencing."
                 },
                 "race_linker": {
                     "type": "string",
@@ -465,9 +465,9 @@
                 "fetch_germlines": {
                     "type": ["string"],
                     "description": "Fetch the selected germline reference bundle at runtime instead of using cached reference inputs.",
-                    "help_text": "This parameter accepts three values. no: use the cached reference inputs. airrc-imgt: the latest version of the human and mouse AIRR-C germline reference will be downloaded from https://ogrdb.airr-community.org/ for all the supported loci and from IMGT for the remaining loci. imgt: the latest version of human and mouse germline reference will be downloaded from IMGT.",
+                    "help_text": "This parameter accepts four values. none: use the cached reference inputs. airrc-imgt: the AIRR-C germline reference is downloaded from https://ogrdb.airr-community.org/ for the loci it covers and from IMGT for the rest. imgt: everything comes from IMGT. ogrdb: only what OGRDB publishes, with no IMGT fallback, which is what a species whose IMGT alignment is not trusted needs.",
                     "fa_icon": "fas fa-cloud-download-alt",
-                    "enum": ["none", "imgt", "airrc-imgt"],
+                    "enum": ["none", "imgt", "airrc-imgt", "ogrdb"],
                     "default": "none"
                 },
                 "generate_igblast_aux": {
@@ -481,7 +481,7 @@
                     "type": "boolean",
                     "default": false,
                     "description": "Skip V(D)J annotation and all downstream analysis steps, running sequence assembly only.",
-                    "help_text": "When set, the pipeline stops after pre-processing and publishes the assembled FASTA that is otherwise an intermediate: `presto/10-splitseq` for the UMI protocols, `presto/05-splitseq` for the non-UMI protocols and `presto/03-fasta` for `dt_5p_race_umi_header`. The `sc_10x_genomics` and `trust4` protocols publish their FASTA under `vdj_annotation/convert-db` either way.",
+                    "help_text": "When set, the pipeline stops after pre-processing and publishes the assembled FASTA that is otherwise an intermediate: `presto/10-splitseq` for the UMI protocols, `presto/05-splitseq` for the non-UMI protocols and `presto/03-fasta` for `dt_5p_ts_header`. The `sc_10x_genomics` and `trust4` protocols publish their FASTA under `vdj_annotation/convert-db` either way.",
                     "fa_icon": "fas fa-forward"
                 }
             },
