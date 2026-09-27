@@ -12,7 +12,7 @@ process GENOTYPE_INFERENCE {
     label 'process_long_parallelized'
     label 'immcantation'
 
-    container "docker.io/peresay/airrflow:5.2.0dev-rm-c3437f3"
+    container "docker.io/peresay/airrflow:5.2.0dev-rm-390aab2"
 
     input:
     tuple val(meta), path(tabs), path(reference_fasta) // meta, sequence tsv in AIRR format

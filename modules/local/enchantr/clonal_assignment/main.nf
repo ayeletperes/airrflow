@@ -13,7 +13,7 @@ process CLONAL_ASSIGNMENT {
     label 'immcantation'
     label 'immcantation_container'
 
-    container "docker.io/peresay/airrflow:5.2.0dev-rm-c3437f3"
+    container "docker.io/peresay/airrflow:5.2.0dev-rm-390aab2"
 
     input:
     tuple val(meta), path(tabs), path(reference_fasta) // meta, sequence tsv in AIRR format
