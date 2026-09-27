@@ -81,18 +81,29 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
     }
 
     if (single_clone_representative) {
-        // create separate channels for repertoire and reference based on the genotypeby metadata field
+        // Fork the channel explicitly rather than reading it twice, once as the process
+        // input and again inside the join: a queue channel read twice leaves the operator
+        // with only part of it, and join() drops whatever it cannot pair without a word.
+        // Join on meta.id, a string, rather than on the whole meta map, so the key cannot
+        // depend on the ordering of a list inside it.
+        ch_repertoire_reference
+            .multiMap { meta, tabs, ref ->
+                to_clones: [ meta, tabs, ref ]
+                refs:      [ meta.id, ref ]
+            }
+            .set { ch_genotype_fork }
 
         CLONAL_ASSIGNMENT_GENOTYPING(
-            ch_repertoire_reference,
+            ch_genotype_fork.to_clones,
             [genotyping_clonal_threshold],
             [],
             cloneby,
             singlecell
         )
         CLONAL_ASSIGNMENT_GENOTYPING.out.tab
-            .join(ch_repertoire_reference
-                        .map{ it -> [it[0], it[2]] })
+            .map { meta, tab -> [ meta.id, meta, tab ] }
+            .join(ch_genotype_fork.refs)
+            .map { _id, meta, tab, ref -> [ meta, tab, ref ] }
             .set{ ch_for_genotyping }
     } else {
         ch_for_genotyping = ch_repertoire_reference

@@ -131,6 +131,7 @@ params {
     crossby: String = 'subject_id'
     singlecell: String = 'single_cell'
     clonal_threshold = 'auto'
+    clonal_threshold_fallback: Float = 0.1
     skip_all_clones_report: Boolean = false
     skip_report_threshold: Boolean = false
     skip_clonal_analysis: Boolean = false
@@ -301,6 +302,7 @@ workflow NFCORE_AIRRFLOW {
         params.single_clone_representative,
         params.genotyping_clonal_threshold,
         params.clonal_threshold,
+        params.clonal_threshold_fallback,
         params.skip_report_threshold,
         params.skip_all_clones_report,
         params.lineage_trees,

@@ -540,6 +540,14 @@
                     "fa_icon": "fab fa-pagelines",
                     "description": "Set the clustering threshold Hamming distance value. Default: 'auto'"
                 },
+                "clonal_threshold_fallback": {
+                    "type": "number",
+                    "minimum": 0,
+                    "default": 0.1,
+                    "fa_icon": "fab fa-pagelines",
+                    "description": "Hamming distance threshold to use when automatic detection produces no usable value.",
+                    "help_text": "With `--clonal_threshold auto` the threshold is inferred from the distance-to-nearest distribution. When that yields nothing usable the run would otherwise stop. This value is used instead and a warning naming it is logged, so the clones of that run are defined at a stated default rather than an inferred threshold. Set it empty to make the failure stop the run."
+                },
                 "lineage_trees": {
                     "type": "boolean",
                     "description": "Perform clonal lineage tree analysis.",

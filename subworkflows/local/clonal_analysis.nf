@@ -9,6 +9,7 @@ workflow CLONAL_ANALYSIS {
     ch_repertoire_reference
     ch_logo
     clonal_threshold
+    clonal_threshold_fallback
     skip_report_threshold
     cloneby
     skip_all_clones_report
@@ -52,19 +53,20 @@ workflow CLONAL_ANALYSIS {
         // Process the collected list to identify when no valid thresholds were found
         clone_threshold = raw_list
             .map { list ->
-                if (!list || list.size() == 0) {
-                    // upstream produced nothing — do not print a message here
-                    return []
+                def valid = (list ?: []).findAll { it != '' && it != 'NA' && it != 'NaN' }
+                if (valid.size() > 0) {
+                    return valid
                 }
-
-                def valid = list.findAll { it != '' && it != 'NA' && it != 'NaN' }
-                if (valid.size() == 0) {
-                    // The automatic threshold finder returned values but all were
-                    // NA, NaN or empty strings - ask the user to set a manual value.
-                    error "Automatic clone_threshold detection failed. Consider setting --clonal_threshold manually."
+                // Inference produced nothing usable: either no values at all, or only NA,
+                // NaN and empty strings. Stopping a cohort run over one bad distance
+                // distribution is worse than proceeding on a stated default, but the
+                // default is a real analysis choice, so say so loudly and do not let it
+                // pass as an inferred value.
+                if (clonal_threshold_fallback == null || clonal_threshold_fallback == '') {
+                    error "Automatic clone_threshold detection produced no usable value. Set --clonal_threshold to a number, or --clonal_threshold_fallback to the value to use when inference fails."
                 }
-
-                return valid
+                log.warn "Automatic clone_threshold detection produced no usable value; using --clonal_threshold_fallback ${clonal_threshold_fallback}. Clones in this run are defined at that threshold, not an inferred one."
+                return [ clonal_threshold_fallback.toString() ]
             }
             .flatten()
 

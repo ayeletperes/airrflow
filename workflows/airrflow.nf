@@ -101,6 +101,7 @@ workflow AIRRFLOW {
         single_clone_representative
         genotyping_clonal_threshold
         clonal_threshold
+        clonal_threshold_fallback
         skip_report_threshold
         skip_all_clones_report
         lineage_trees
@@ -415,6 +416,7 @@ workflow AIRRFLOW {
                     ch_repertoire_reference,
                     ch_report_logo_img.collect().ifEmpty([]),
                     clonal_threshold,
+                    clonal_threshold_fallback,
                     skip_report_threshold,
                     cloneby,
                     skip_all_clones_report,
