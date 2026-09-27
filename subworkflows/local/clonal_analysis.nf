@@ -158,7 +158,10 @@ def get_meta_tabs(arr, genotypeby, cloneby) {
 
     def meta = [:]
     meta.id                 = [arr[0]].unique().join("")
-    meta.sample_id          = arr[2].flatten()
+    // Sorted because this map is a join key: every other field here is collapsed to a
+    // scalar, and an unsorted list makes two otherwise equal metas compare unequal, so
+    // join() drops the pair without a word.
+    meta.sample_id          = arr[2].flatten().sort()
     meta.subject_id         = arr[3].unique().join("")
     meta.species            = arr[4].unique().join("")
     meta.single_cell        = arr[5].unique().join("")

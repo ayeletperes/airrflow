@@ -1,6 +1,5 @@
 include { NOVEL_ALLELE_INFERENCE } from '../../modules/local/enchantr/novel_allele_inference'
-include { BAYESIAN_GENOTYPE_INFERENCE  } from '../../modules/local/enchantr/bayesian_genotype_inference'
-include { ALLELE_BASED_GENOTYPE_INFERENCE } from '../../modules/local/enchantr/allele_based_genotype_inference'
+include { GENOTYPE_INFERENCE } from '../../modules/local/enchantr/genotype_inference'
 include { REASSIGN_ALLELES as REASSIGN_ALLELES_NOVEL; REASSIGN_ALLELES as REASSIGN_ALLELES_GENOTYPE} from '../../modules/local/enchantr/reassign_alleles'
 include { CLONAL_ANALYSIS } from './clonal_analysis'
 include { CLONAL_ASSIGNMENT as CLONAL_ASSIGNMENT_GENOTYPING } from '../../modules/local/enchantr/clonal_assignment'
@@ -99,23 +98,16 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
         ch_for_genotyping = ch_repertoire_reference
     }
 
-    // infer genotype
-    if (genotype_method == 'allele_based') {
-        ALLELE_BASED_GENOTYPE_INFERENCE (
-            ch_for_genotyping,
-            genotypeby,
-            single_clone_representative,
-            ch_allele_thresholds_db
-        )
-        ch_genotype_reference = ALLELE_BASED_GENOTYPE_INFERENCE.out.reference
-    } else {
-        BAYESIAN_GENOTYPE_INFERENCE (
-            ch_for_genotyping,
-            genotypeby,
-            single_clone_representative
-        )
-        ch_genotype_reference = BAYESIAN_GENOTYPE_INFERENCE.out.reference
-    }
+    // infer genotype. One module, one enchantr report; `genotype_method` selects between
+    // bayesian, fraction and allele_based.
+    GENOTYPE_INFERENCE (
+        ch_for_genotyping,
+        genotypeby,
+        single_clone_representative,
+        genotype_method,
+        ch_allele_thresholds_db
+    )
+    ch_genotype_reference = GENOTYPE_INFERENCE.out.reference
 
     ch_grouped_repertoires
         .map{ it -> [it[0], it[1]] }
@@ -151,7 +143,10 @@ def get_meta_tabs(arr) {
 
     def meta = [:]
     meta.id            = [arr[0]].unique().join("")
-    meta.sample_id          = arr[2].flatten()
+    // Sorted because this map is a join key: every other field here is collapsed to a
+    // scalar, and an unsorted list makes two otherwise equal metas compare unequal, so
+    // join() drops the pair without a word.
+    meta.sample_id          = arr[2].flatten().sort()
     meta.subject_id         = arr[3].unique().join("")
     meta.species            = arr[4].unique().join("")
     meta.single_cell        = arr[5].unique().join("")

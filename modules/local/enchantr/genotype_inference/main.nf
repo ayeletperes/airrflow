@@ -6,7 +6,7 @@ def asString (args) {
     }.join('')
 }
 
-process BAYESIAN_GENOTYPE_INFERENCE {
+process GENOTYPE_INFERENCE {
     tag "${meta.id}"
 
     label 'process_long_parallelized'
@@ -15,15 +15,18 @@ process BAYESIAN_GENOTYPE_INFERENCE {
     container "docker.io/peresay/airrflow:5.2.0dev-rm-490ca1b"
 
     input:
-    tuple val(meta), path(tabs), path(reference_fasta) // meta, compressed sequence tsv in AIRR format
+    tuple val(meta), path(tabs), path(reference_fasta) // meta, sequence tsv in AIRR format
     val genotypeby
     val single_clone_representative
+    val genotype_method
+    path allele_thresholds_db
 
     output:
     tuple val(meta), path("*_report/references/*/db_genotype"), emit: reference // reference folder
     path("*/*_command_log.txt"), emit: logs //process logs
     path "*_report"
     tuple val("${task.process}"), val('enchantr'), eval('Rscript -e "library(enchantr); cat(as.character(packageVersion(\'enchantr\')))"'), emit: versions_enchantr, topic: versions
+    tuple val("${task.process}"), val('piglet'), eval("Rscript -e \"library(piglet); cat(as.character(packageVersion('piglet')))\""), emit: versions_piglet, topic: versions
     tuple val("${task.process}"), val('tigger'), eval("Rscript -e \"library(tigger); cat(as.character(packageVersion('tigger')))\""), emit: versions_tigger, topic: versions
 
 
@@ -34,16 +37,20 @@ process BAYESIAN_GENOTYPE_INFERENCE {
     }
     def args = task.ext.args ? asString(task.ext.args) : ''
     def input = tabs.join(',')
+    // One enchantr report serves every genotype method: bayesian, fraction and allele_based.
+    // allele_thresholds_db is read only by allele_based and arrives empty for the others.
     """
-    Rscript -e "enchantr::enchantr_report('tigger_bayesian_genotype', \\
+    Rscript -e "enchantr::enchantr_report('genotype', \\
                                         report_params=list('input'='${input}', \\
                                         'imgt_db'='${reference_fasta}', \\
                                         'genotypeby'='${genotypeby}', \\
+                                        'method'='${genotype_method}', \\
+                                        'allele_thresholds_db'='${allele_thresholds_db}', \\
                                         'single_clone_representative'='${single_clone_representative}', \\
                                         'outdir'=getwd(), \\
-                                        'log'='${meta.id}_bayesian_genotype_inference_command_log' ${args}))"
+                                        'log'='${meta.id}_${genotype_method}_genotype_inference_command_log' ${args}))"
 
-    cp -r enchantr ${meta.id}_bayesian_genotype_inference_report && rm -rf enchantr
+    cp -r enchantr ${meta.id}_${genotype_method}_genotype_inference_report && rm -rf enchantr
 
     """
 }
