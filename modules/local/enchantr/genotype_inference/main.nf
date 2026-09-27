@@ -37,8 +37,7 @@ process GENOTYPE_INFERENCE {
     }
     def args = task.ext.args ? asString(task.ext.args) : ''
     def input = tabs.join(',')
-    // One enchantr report serves every genotype method: bayesian, fraction and allele_based.
-    // allele_thresholds_db is read only by allele_based and arrives empty for the others.
+    // One report serves every method; allele_thresholds_db is read only by allele_based.
     """
     Rscript -e "enchantr::enchantr_report('genotype', \\
                                         report_params=list('input'='${input}', \\

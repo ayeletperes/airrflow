@@ -57,11 +57,8 @@ workflow CLONAL_ANALYSIS {
                 if (valid.size() > 0) {
                     return valid
                 }
-                // Inference produced nothing usable: either no values at all, or only NA,
-                // NaN and empty strings. Stopping a cohort run over one bad distance
-                // distribution is worse than proceeding on a stated default, but the
-                // default is a real analysis choice, so say so loudly and do not let it
-                // pass as an inferred value.
+                // Nothing usable from inference: use the stated fallback rather than
+                // stopping, and say which value was used.
                 if (clonal_threshold_fallback == null || clonal_threshold_fallback == '') {
                     error "Automatic clone_threshold detection produced no usable value. Set --clonal_threshold to a number, or --clonal_threshold_fallback to the value to use when inference fails."
                 }
@@ -160,9 +157,7 @@ def get_meta_tabs(arr, genotypeby, cloneby) {
 
     def meta = [:]
     meta.id                 = [arr[0]].unique().join("")
-    // Sorted because this map is a join key: every other field here is collapsed to a
-    // scalar, and an unsorted list makes two otherwise equal metas compare unequal, so
-    // join() drops the pair without a word.
+    // Sorted, so the map is stable as a join key.
     meta.sample_id          = arr[2].flatten().sort()
     meta.subject_id         = arr[3].unique().join("")
     meta.species            = arr[4].unique().join("")

@@ -81,11 +81,8 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
     }
 
     if (single_clone_representative) {
-        // Fork the channel explicitly rather than reading it twice, once as the process
-        // input and again inside the join: a queue channel read twice leaves the operator
-        // with only part of it, and join() drops whatever it cannot pair without a word.
-        // Join on meta.id, a string, rather than on the whole meta map, so the key cannot
-        // depend on the ordering of a list inside it.
+        // Fork so the process and the join each get their own copy, and key the join on
+        // the id rather than the whole meta.
         ch_repertoire_reference
             .multiMap { meta, tabs, ref ->
                 to_clones: [ meta, tabs, ref ]
@@ -154,9 +151,7 @@ def get_meta_tabs(arr) {
 
     def meta = [:]
     meta.id            = [arr[0]].unique().join("")
-    // Sorted because this map is a join key: every other field here is collapsed to a
-    // scalar, and an unsorted list makes two otherwise equal metas compare unequal, so
-    // join() drops the pair without a word.
+    // Sorted, so the map is stable as a join key.
     meta.sample_id          = arr[2].flatten().sort()
     meta.subject_id         = arr[3].unique().join("")
     meta.species            = arr[4].unique().join("")
