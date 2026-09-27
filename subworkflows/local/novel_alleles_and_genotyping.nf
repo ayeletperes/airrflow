@@ -22,7 +22,10 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
     ch_logs = channel.empty()
 
     if (allele_thresholds_db) {
-        ch_allele_thresholds_db = channel.fromPath(allele_thresholds_db, checkIfExists: true)
+        // .first() makes this a value channel. As a queue channel it holds one item, and a
+        // process pairs its queue inputs element-wise, so the genotype would run once no
+        // matter how many repertoires it was given.
+        ch_allele_thresholds_db = channel.fromPath(allele_thresholds_db, checkIfExists: true).first()
     } else {
         ch_allele_thresholds_db = []
     }
@@ -83,14 +86,12 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
     if (single_clone_representative) {
         // Fork so the process and the join each get their own copy, and key the join on
         // the id rather than the whole meta.
-        ch_repertoire_reference.dump(tag: 'dbg_reference')
         ch_repertoire_reference
             .multiMap { meta, tabs, ref ->
                 to_clones: [ meta, tabs, ref ]
                 refs:      [ meta.id, ref ]
             }
             .set { ch_genotype_fork }
-        ch_genotype_fork.refs.dump(tag: 'dbg_refs')
 
         CLONAL_ASSIGNMENT_GENOTYPING(
             ch_genotype_fork.to_clones,
@@ -99,13 +100,11 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
             cloneby,
             singlecell
         )
-        CLONAL_ASSIGNMENT_GENOTYPING.out.tab.dump(tag: 'dbg_clone_out')
         CLONAL_ASSIGNMENT_GENOTYPING.out.tab
             .map { meta, tab -> [ meta.id, meta, tab ] }
             .join(ch_genotype_fork.refs)
             .map { _id, meta, tab, ref -> [ meta, tab, ref ] }
             .set{ ch_for_genotyping }
-        ch_for_genotyping.dump(tag: 'dbg_for_genotype')
     } else {
         ch_for_genotyping = ch_repertoire_reference
     }
