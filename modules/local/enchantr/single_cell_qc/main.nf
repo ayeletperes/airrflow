@@ -12,7 +12,7 @@ process SINGLE_CELL_QC {
     label 'process_medium'
     label 'immcantation_container'
 
-    container "docker.io/peresay/airrflow:5.2.0dev-rm-490ca1b"
+    container "docker.io/peresay/airrflow:5.2.0dev-rm-c3437f3"
 
     input:
     path(tabs)

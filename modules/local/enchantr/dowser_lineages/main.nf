@@ -13,7 +13,7 @@ process DOWSER_LINEAGES {
     label 'immcantation'
     label 'immcantation_container'
 
-    container "docker.io/peresay/airrflow:5.2.0dev-rm-490ca1b"
+    container "docker.io/peresay/airrflow:5.2.0dev-rm-c3437f3"
 
     input:
     tuple val(meta), path(tabs)
