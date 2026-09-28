@@ -174,6 +174,14 @@ workflow AIRRFLOW {
         ch_input_check_logs      = INPUT_CHECK.out.logs
         ch_validated_samplesheet = INPUT_CHECK.out.validated_samplesheet.collect()
 
+        // Samples per genotype group, taken from the samplesheet before any task runs.
+        // groupTuple() with no size cannot release a group until the whole upstream channel
+        // closes, so without this every subject waits for the slowest one to be annotated.
+        ch_genotype_group_sizes = INPUT_CHECK.out.meta
+            .map { meta -> genotypeby == 'sample_id' ? meta.id : meta[genotypeby] }
+            .collect()
+            .map { keys -> keys.countBy { it } }
+
         // Download or fetch databases
         DATABASES(
             fetch_germlines,
@@ -391,6 +399,7 @@ workflow AIRRFLOW {
                         .map { _key, meta, tab, _igblast, reference -> [ meta, tab, reference ] },
                     ch_validated_samplesheet.collect(),
                     ch_report_logo_img.collect().ifEmpty([]),
+                    ch_genotype_group_sizes,
                     genotypeby,
                     genotype_method,
                     allele_thresholds_db,

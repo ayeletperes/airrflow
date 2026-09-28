@@ -9,6 +9,7 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
     ch_repertoire // channel: [ val(meta), path(tab), path(reference_fasta) ]
     ch_validated_samplesheet
     ch_logo
+    ch_group_sizes // channel: map of genotype group -> number of samples
     genotypeby
     genotype_method
     allele_thresholds_db
@@ -30,14 +31,20 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
         ch_allele_thresholds_db = []
     }
 
-    // merge all repertoires by genotypeby metadata field
+    // merge all repertoires by genotypeby metadata field. groupKey carries the expected number
+    // of samples so a group is released as soon as it is full, rather than when the last
+    // repertoire in the run arrives. remainder keeps a group whose samples were filtered out
+    // upstream, which a sized groupTuple would otherwise discard without a word.
     ch_repertoire
-        .map{ it ->
-                def meta = it[0]
-                def rep = it[1]
-                def ref = it[2]
+        .combine(ch_group_sizes)
+        .map{ meta, rep, ref, sizes ->
                 def genotypeby_field = genotypeby=="sample_id" ? "id" : genotypeby
-                [ meta[genotypeby_field],
+                def key = meta[genotypeby_field]
+                // A key the samplesheet does not account for groups without a size, which is
+                // the old behaviour: released at the end rather than dropped.
+                def n = sizes[key]
+                if (!n) { log.warn "No sample count for genotype group ${key}; it will be released only when every repertoire is ready" }
+                [ n ? groupKey(key, n) : key,
                                     meta.id,
                                     meta.sample_id,
                                     meta.subject_id,
@@ -46,7 +53,7 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
                                     meta.locus,
                                     rep,
                                     ref ] }
-                    .groupTuple()
+                    .groupTuple(remainder: true)
                     .map{ get_meta_tabs(it) }
                     .set{ ch_grouped_repertoires }
 
@@ -153,7 +160,8 @@ def get_meta_tabs(arr) {
     }
 
     def meta = [:]
-    meta.id            = [arr[0]].unique().join("")
+    // arr[0] is a GroupKey; downstream joins key on meta.id, so keep it a plain string.
+    meta.id            = arr[0].toString()
     // Sorted, so the map is stable as a join key.
     meta.sample_id          = arr[2].flatten().sort()
     meta.subject_id         = arr[3].unique().join("")
