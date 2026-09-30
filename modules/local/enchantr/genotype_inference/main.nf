@@ -9,7 +9,9 @@ def asString (args) {
 process GENOTYPE_INFERENCE {
     tag "${meta.id}"
 
-    label 'process_long_parallelized'
+    // These reports take no nproc and run on one core; the parallelized label reserved 16.
+    label 'process_single'
+    label 'process_long'
     label 'immcantation'
 
     container "docker.io/peresay/airrflow:5.2.0dev-rm-390aab2"
