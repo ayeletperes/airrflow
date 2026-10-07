@@ -13,7 +13,7 @@ process COLLAPSE_DUPLICATES {
     label 'immcantation'
     label 'immcantation_container'
 
-    container "docker.io/peresay/airrflow:5.2.0dev-rm-390aab2"
+    container "docker.io/peresay/airrflow:5.2.0dev-rm-79dbfdd"
 
     input:
     tuple val(meta), path(tabs) // tuple [val(meta), compressed sequence tsv in AIRR format ]
