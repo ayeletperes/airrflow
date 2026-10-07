@@ -14,7 +14,7 @@ process GENOTYPE_INFERENCE {
     label 'process_long'
     label 'immcantation'
 
-    container "docker.io/peresay/airrflow:5.2.0dev-rm-79dbfdd"
+    container "docker.io/immcantation/airrflow:5.2.0dev"
 
     input:
     tuple val(meta), path(tabs), path(reference_fasta) // meta, sequence tsv in AIRR format

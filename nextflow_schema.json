@@ -816,6 +816,14 @@
                     "fa_icon": "fas fa-question-circle",
                     "hidden": true
                 },
+                "immcantation_container": {
+                    "type": "string",
+                    "default": "docker.io/peresay/airrflow:5.2.0dev-rm-79dbfdd",
+                    "description": "Container image for the enchantr report processes.",
+                    "help_text": "Every enchantr module carries the `immcantation` label and `conf/base.config` points that label here, so one value sets the image for all of them.",
+                    "fa_icon": "fas fa-box",
+                    "hidden": true
+                },
                 "publish_dir_mode": {
                     "type": "string",
                     "default": "copy",
