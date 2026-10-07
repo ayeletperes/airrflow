@@ -13,6 +13,7 @@ process REASSIGN_ALLELES {
     label 'process_single'
     label 'process_long'
     label 'immcantation'
+    label 'immcantation_container'
 
     container "docker.io/immcantation/airrflow:5.2.0dev"
 
