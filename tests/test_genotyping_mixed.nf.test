@@ -24,8 +24,8 @@ nextflow_pipeline {
             def stable_path = getAllFilesFromDir(params.outdir, ignoreFile: 'tests/.nftignore')
             assertAll(
                 { assert workflow.success},
-                { assert processes.any { it.contains('BAYESIAN_GENOTYPE_INFERENCE_IG') } },
-                { assert processes.any { it.contains('BAYESIAN_GENOTYPE_INFERENCE_TR') } },
+                { assert processes.any { it.contains('GENOTYPE_INFERENCE_IG') } },
+                { assert processes.any { it.contains('GENOTYPE_INFERENCE_TR') } },
                 { assert processes.any { it.contains('NOVEL_ALLELE_INFERENCE') } },
                 { assert processes.any { it.contains('REASSIGN_ALLELES_NOVEL') } },
                 { assert processes.any { it.contains('REASSIGN_ALLELES_GENOTYPE') } },

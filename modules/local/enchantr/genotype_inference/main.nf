@@ -6,7 +6,7 @@ def asString (args) {
     }.join('')
 }
 
-process BAYESIAN_GENOTYPE_INFERENCE {
+process GENOTYPE_INFERENCE {
     tag "${meta.id}"
 
     label 'process_long_parallelized'
@@ -19,6 +19,8 @@ process BAYESIAN_GENOTYPE_INFERENCE {
     tuple val(meta), path(tabs), path(reference_fasta) // meta, compressed sequence tsv in AIRR format
     val genotypeby
     val single_clone_representative
+    val method                  // bayesian or allele_based
+    path allele_thresholds_db   // allele_based only, [] otherwise
 
     output:
     tuple val(meta), path("*_report/references/*/db_genotype"), emit: reference // reference folder
@@ -26,7 +28,7 @@ process BAYESIAN_GENOTYPE_INFERENCE {
     path "*_report/*"
     tuple val("${task.process}"), val('enchantr'), eval('Rscript -e "library(enchantr); cat(as.character(packageVersion(\'enchantr\')))"'), emit: versions_enchantr, topic: versions
     tuple val("${task.process}"), val('tigger'), eval("Rscript -e \"library(tigger); cat(as.character(packageVersion('tigger')))\""), emit: versions_tigger, topic: versions
-
+    tuple val("${task.process}"), val('piglet'), eval("Rscript -e \"library(piglet); cat(as.character(packageVersion('piglet')))\""), emit: versions_piglet, topic: versions
 
     script:
     // Exit if running this module with -profile conda / -profile mamba
@@ -35,16 +37,18 @@ process BAYESIAN_GENOTYPE_INFERENCE {
     }
     def args = task.ext.args ? asString(task.ext.args) : ''
     def input = tabs.join(',')
+    def thresholds = allele_thresholds_db ? ",'allele_thresholds_db'='${allele_thresholds_db}'" : ''
     """
-    Rscript -e "enchantr::enchantr_report('tigger_bayesian_genotype', \\
+    Rscript -e "enchantr::enchantr_report('genotype', \\
                                         report_params=list('input'='${input}', \\
                                         'imgt_db'='${reference_fasta}', \\
                                         'genotypeby'='${genotypeby}', \\
+                                        'method'='${method}', \\
                                         'single_clone_representative'='${single_clone_representative}', \\
                                         'outdir'=getwd(), \\
-                                        'log'='${meta.id}_bayesian_genotype_inference_command_log' ${args}))"
+                                        'log'='${meta.id}_genotype_inference_command_log' ${thresholds} ${args}))"
 
-    mv enchantr ${meta.id}_bayesian_genotype_inference_report
+    mv enchantr ${meta.id}_genotype_inference_report
 
     """
 }

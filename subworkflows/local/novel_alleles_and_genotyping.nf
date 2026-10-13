@@ -1,6 +1,5 @@
 include { NOVEL_ALLELE_INFERENCE } from '../../modules/local/enchantr/novel_allele_inference'
-include { BAYESIAN_GENOTYPE_INFERENCE as BAYESIAN_GENOTYPE_INFERENCE_IG } from '../../modules/local/enchantr/bayesian_genotype_inference'
-include { BAYESIAN_GENOTYPE_INFERENCE as BAYESIAN_GENOTYPE_INFERENCE_TR } from '../../modules/local/enchantr/bayesian_genotype_inference'
+include { GENOTYPE_INFERENCE as GENOTYPE_INFERENCE_IG; GENOTYPE_INFERENCE as GENOTYPE_INFERENCE_TR } from '../../modules/local/enchantr/genotype_inference'
 include { REASSIGN_ALLELES as REASSIGN_ALLELES_NOVEL; REASSIGN_ALLELES as REASSIGN_ALLELES_GENOTYPE} from '../../modules/local/enchantr/reassign_alleles'
 include { CLONAL_ANALYSIS } from './clonal_analysis'
 include { CLONAL_ASSIGNMENT as CLONAL_ASSIGNMENT_GENOTYPING } from '../../modules/local/enchantr/clonal_assignment'
@@ -12,6 +11,8 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
     ch_validated_samplesheet
     ch_logo
     genotypeby
+    genotype_method
+    allele_thresholds_db
     novel_allele_inference
     single_clone_representative
     genotyping_clonal_threshold
@@ -115,21 +116,26 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
         ch_ig_for_genotyping = ch_repertoire_reference_by_locus.ig
     }
 
-    // infer genotype. TR skips single-clone representative preprocessing.
-    BAYESIAN_GENOTYPE_INFERENCE_IG (
+    // infer genotype. TR skips single-clone representative preprocessing, and always
+    // runs bayesian: the allele threshold tables are measured for IG genes.
+    GENOTYPE_INFERENCE_IG (
         ch_ig_for_genotyping,
         genotypeby,
-        single_clone_representative
+        single_clone_representative,
+        genotype_method,
+        allele_thresholds_db ? file(allele_thresholds_db, checkIfExists: true) : []
     )
-    BAYESIAN_GENOTYPE_INFERENCE_TR (
+    GENOTYPE_INFERENCE_TR (
         ch_repertoire_reference_by_locus.tr,
         genotypeby,
-        false
+        false,
+        'bayesian',
+        []
     )
 
     // Combine the personalized genotype references inferred for IG and TR loci.
-    BAYESIAN_GENOTYPE_INFERENCE_IG.out.reference
-        .mix(BAYESIAN_GENOTYPE_INFERENCE_TR.out.reference)
+    GENOTYPE_INFERENCE_IG.out.reference
+        .mix(GENOTYPE_INFERENCE_TR.out.reference)
         .set{ ch_genotype_reference }
 
     // Reassign genotype calls using the personalized genotype reference for both
