@@ -1,6 +1,7 @@
 include { NOVEL_ALLELE_INFERENCE } from '../../modules/local/enchantr/novel_allele_inference'
 include { GENOTYPE_INFERENCE as GENOTYPE_INFERENCE_IG; GENOTYPE_INFERENCE as GENOTYPE_INFERENCE_TR } from '../../modules/local/enchantr/genotype_inference'
 include { REASSIGN_ALLELES as REASSIGN_ALLELES_NOVEL; REASSIGN_ALLELES as REASSIGN_ALLELES_GENOTYPE} from '../../modules/local/enchantr/reassign_alleles'
+include { RABHIT_HAPLOTYPE } from '../../modules/local/enchantr/rabhit_haplotype'
 include { CLONAL_ANALYSIS } from './clonal_analysis'
 include { CLONAL_ASSIGNMENT as CLONAL_ASSIGNMENT_GENOTYPING } from '../../modules/local/enchantr/clonal_assignment'
 
@@ -13,6 +14,8 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
     genotypeby
     genotype_method
     allele_thresholds_db
+    haplotyping
+    haplotype_anchor
     novel_allele_inference
     single_clone_representative
     genotyping_clonal_threshold
@@ -156,6 +159,14 @@ workflow NOVEL_ALLELES_AND_GENOTYPING {
 
     ch_repertoire_reference = REASSIGN_ALLELES_GENOTYPE.out.tab.join(ch_genotype_reference)
     ch_repertoire_reference.dump(tag: "ch_repertoire_reference_genotyping")
+
+    // Haplotype the heavy chain of each IG genotype group, on its reassigned calls.
+    if (haplotyping) {
+        RABHIT_HAPLOTYPE (
+            ch_repertoire_reference.filter { it -> it[0].locus == 'IG' },
+            haplotype_anchor
+        )
+    }
 
 
     emit:

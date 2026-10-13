@@ -404,6 +404,9 @@ This folder is generated when `detect_contamination` is set to `true`.
   - `*log`: Log of the process.
   - `genotypes`: Genotype report.
   - `repertoires`: Rearrangement tables in AIRR-C format with sequences after allele reassignment.
+- `novel_alleles_and_genotyping/03-haplotype_inference/` (with `--haplotyping`)
+  - `*_haplotype_report/haplotypes/*_haplotype.tsv`: RAbHIT haplotype table, one row per haplotyped gene, with the alleles assigned to each anchor chromosome.
+  - `*_haplotype_report/haplotypes/*_deletions.tsv`: deletion calls, when deletion inference is switched on.
   </details>
 
 ## Clonal analysis

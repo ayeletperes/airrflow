@@ -148,6 +148,8 @@ params {
     genotypeby: String = 'subject_id'
     genotype_method: String = 'bayesian'
     allele_thresholds_db: String? = null
+    haplotyping: Boolean = false
+    haplotype_anchor: String = 'IGHJ6'
     novel_allele_inference: Boolean = true
     genotyping_clonal_threshold: Float = 0.2
     single_clone_representative: Boolean = true
@@ -301,6 +303,8 @@ workflow NFCORE_AIRRFLOW {
         params.genotypeby,
         params.genotype_method,
         params.allele_thresholds_db,
+        params.haplotyping,
+        params.haplotype_anchor,
         params.novel_allele_inference,
         params.single_clone_representative,
         params.genotyping_clonal_threshold,

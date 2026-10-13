@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 
 - [#516](https://github.com/nf-core/airrflow/pull/516) Build the IgBLAST database from `--reference_fasta` when `--reference_igblast` is not given.
 - [#516](https://github.com/nf-core/airrflow/pull/516) Added the `--generate_igblast_aux` parameter (default `true`), which regenerates the IgBLAST `.ndm` and `.aux` auxiliary files from the germline reference in use with `receptor_utils`, replacing the ones shipped with IgBLAST.
+- Added `--haplotyping` and `--haplotype_anchor`, to infer IGH haplotypes with RAbHIT after genotyping.
 - Added `--genotype_method` (`bayesian` or `allele_based`) and `--allele_thresholds_db`, to infer the IG genotype with PIgLET's allele based method. TR genotypes stay bayesian.
 - Added `--genotype_report_args` and `--collapse_report_args`, which pass extra enchantr report parameters as `name=value` pairs separated by `;`.
 - `pcr_target_locus` accepts a single locus (`IGH`, `IGI`, `IGK`, `IGL`, `TRA`, `TRB`, `TRG`, `TRD`), or a comma-separated list of loci from one class such as `IGK,IGL`, as well as a receptor class. Annotation still runs on the class.

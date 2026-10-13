@@ -96,6 +96,8 @@ workflow AIRRFLOW {
         genotypeby
         genotype_method
         allele_thresholds_db
+        haplotyping
+        haplotype_anchor
         novel_allele_inference
         single_clone_representative
         genotyping_clonal_threshold
@@ -150,6 +152,9 @@ workflow AIRRFLOW {
             if (genotype_method != 'allele_based' && allele_thresholds_db) {
                 error "The '--allele_thresholds_db' option is only used by the 'allele_based' genotype method, but '--genotype_method' is '${genotype_method}'. Please set '--genotype_method allele_based' or remove '--allele_thresholds_db'."
             }
+        }
+        if (haplotyping && !genotyping) {
+            error "Haplotype inference runs on the genotyped repertoires, so '--haplotyping' requires '--genotyping'."
         }
 
         ch_versions = channel.empty()
@@ -404,6 +409,8 @@ workflow AIRRFLOW {
                 genotypeby,
                 genotype_method,
                 allele_thresholds_db,
+                haplotyping,
+                haplotype_anchor,
                 novel_allele_inference,
                 single_clone_representative,
                 genotyping_clonal_threshold,

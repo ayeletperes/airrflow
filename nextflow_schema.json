@@ -604,6 +604,18 @@
                     "enum": ["bayesian", "allele_based"],
                     "fa_icon": "fas fa-dna"
                 },
+                "haplotyping": {
+                    "type": "boolean",
+                    "description": "Infer IGH haplotypes with RAbHIT. Requires `--genotyping`.",
+                    "help_text": "Phases the genotyped heavy chain V and D alleles of each subject onto its two chromosomes, using a heterozygous anchor gene (`--haplotype_anchor`). A subject whose anchor gene is not heterozygous cannot be haplotyped.",
+                    "fa_icon": "fas fa-code-branch"
+                },
+                "haplotype_anchor": {
+                    "type": "string",
+                    "default": "IGHJ6",
+                    "description": "Heterozygous anchor gene used to phase the haplotype.",
+                    "fa_icon": "fas fa-anchor"
+                },
                 "allele_thresholds_db": {
                     "type": "string",
                     "format": "file-path",
